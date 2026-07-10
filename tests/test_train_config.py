@@ -9,14 +9,19 @@ from wordle_rl.train import build_game_wiring, find_resume_checkpoint
 
 
 def test_presets_budget_invariant():
-    assert SMOKE.game_max_turns * SMOKE.per_turn_max_tokens <= SMOKE.max_completion_length
-    assert FULL.game_max_turns * FULL.per_turn_max_tokens <= FULL.max_completion_length
+    # 含回饋文字估計值的完整預算必須 <= max_completion_length（M2.1 spike 修正後的公式）
+    for p in (SMOKE, FULL):
+        needed = p.game_max_turns * (p.per_turn_max_tokens + p.feedback_overhead_per_turn)
+        assert needed <= p.max_completion_length
+        # raw_generation_budget（不含回饋）嚴格小於含回饋的完整預算
+        assert p.raw_generation_budget == p.game_max_turns * p.per_turn_max_tokens
+        assert p.raw_generation_budget < p.max_completion_length
 
 
 def test_full_preset_values_match_plan():
     assert FULL.game == "wordle" and FULL.num_generations == 8
     assert FULL.beta == pytest.approx(0.01)
-    assert FULL.max_completion_length == 1024 and FULL.per_turn_max_tokens == 160
+    assert FULL.max_completion_length == 1536 and FULL.per_turn_max_tokens == 160
     assert FULL.checkpoint_minutes == 30 and FULL.sample_every_steps == 50
 
 
@@ -26,7 +31,7 @@ def test_get_preset_override_and_validation():
     with pytest.raises(ValueError):
         get_preset("nope")
     with pytest.raises(ValueError):
-        get_preset("full", per_turn_max_tokens=1024)  # 6×1024 > 1024 預算爆炸
+        get_preset("full", per_turn_max_tokens=1024)  # 6×(1024+48) 遠超 1536 預算爆炸
 
 
 def test_find_resume_checkpoint(tmp_path):

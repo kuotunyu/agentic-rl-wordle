@@ -149,7 +149,10 @@ def main(argv: list[str] | None = None) -> int:
         answers=answers,
         num_generations=preset.num_generations,
         per_turn_max_tokens=preset.per_turn_max_tokens,
-        max_total_tokens=preset.max_completion_length,
+        # 送進 rollout 引擎的是「原始生成」預算（不含回饋文字），控制何時停止再生成
+        # 下一回合；GRPOConfig 的 max_completion_length（下面）是含回饋文字的整段預算，
+        # 兩者不同（M2.1 spike 修正，見 config.py／rollout.py 說明）。
+        max_total_tokens=preset.raw_generation_budget,
         temperature=preset.temperature,
         top_p=preset.top_p,
         stop=("</guess>",),

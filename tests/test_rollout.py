@@ -11,6 +11,8 @@ from wordle_rl.rollout import (
     RolloutBuffers,
     SpikeValidationError,
     TurnGen,
+    TurnSegment,
+    build_masked_completion,
     make_answer_sampler,
     make_rollout_func,
     make_trl_reward_fn,
@@ -61,6 +63,13 @@ def test_completion_concat_and_logprob_alignment():
     (r,) = play_batch_episodes(generate, [g], per_turn_max_tokens=64)
     assert len(r.completion_ids) == len(t1) + len(t2)
     assert len(r.logprobs) == len(r.completion_ids)
+    # segments 記錄每回合前後的完整 messages 快照，供 build_masked_completion 用
+    # （protocol.build_messages 對每筆歷史記錄都無條件補一段「下一輪指示」，
+    # 就算該回合已經猜中，所以兩回合後都是 user 結尾，這是既有行為，不是這次改動）
+    assert len(r.segments) == 2
+    assert r.segments[0].messages_before[-1]["role"] == "user"
+    assert r.segments[0].messages_after[-1]["role"] == "user"
+    assert r.segments[1].messages_after[-1]["role"] == "user"
 
 
 def test_budget_truncation_marks_episode():
@@ -292,3 +301,99 @@ def test_trl_generate_fn_missing_fields_fails_loud_not_silent(fake_trl_module):
     )
     with pytest.raises(SpikeValidationError, match="token_ids"):
         gen([[{"role": "user", "content": "hi"}]])
+
+
+# ---------------------------------------------------------------- build_masked_completion
+
+
+class _CharTokenizer:
+    """不截斷、一字元一 token 的假 tokenizer——用來驗證 build_masked_completion 的
+    delta 邏輯（FakeTokenizer 那個會把長度截到 16，不適合測這裡的成長型序列）。
+    """
+
+    def apply_chat_template(self, msgs, tokenize=False, add_generation_prompt=True):
+        text = "\n".join(f"{m['role']}:{m['content']}" for m in msgs)
+        if add_generation_prompt:
+            text += "\nassistant:"
+        return text
+
+    def __call__(self, text, add_special_tokens=False):
+        return {"input_ids": [ord(c) for c in text]}
+
+
+def test_build_masked_completion_marks_generated_vs_feedback():
+    tok = _CharTokenizer()
+    messages_before = (
+        {"role": "system", "content": "rules"},
+        {"role": "user", "content": "go"},
+    )
+    gen = TurnGen(token_ids=(1, 2, 3), logprobs=(-0.1, -0.2, -0.3), text="<guess>50</guess>")
+    # 局未結束：canonical assistant + 環境回饋（含下一輪指示）
+    messages_after = messages_before + (
+        {"role": "assistant", "content": "<guess>50</guess>"},
+        {"role": "user", "content": "HIGHER. Turn 2 of 7."},
+    )
+    seg = TurnSegment(gen=gen, messages_before=messages_before, messages_after=messages_after)
+
+    completion_ids, logprobs, env_mask = build_masked_completion(tok, [seg])
+
+    assert len(completion_ids) == len(logprobs) == len(env_mask)
+    # 前段是模型真實生成的 token：id/logprob 原封不動、mask=1
+    assert completion_ids[:3] == [1, 2, 3]
+    assert logprobs[:3] == [-0.1, -0.2, -0.3]
+    assert env_mask[:3] == [1, 1, 1]
+    # 後段是插入的回饋文字：mask=0、logprob 填 0（數值不影響 loss）
+    assert len(completion_ids) > 3
+    assert all(m == 0 for m in env_mask[3:])
+    assert all(lp == 0.0 for lp in logprobs[3:])
+
+
+def test_build_masked_completion_last_turn_has_no_trailing_feedback():
+    """最後一回合（局已結束，沒有下一輪 generation prompt、也沒有新的回饋訊息）：
+    completion_ids 應該恰好等於模型生成的 token，不多不少。"""
+    tok = _CharTokenizer()
+    messages_before = (
+        {"role": "system", "content": "rules"},
+        {"role": "user", "content": "go"},
+    )
+    gen = TurnGen(token_ids=(9, 9), logprobs=(-0.5, -0.5), text="<guess>7</guess>")
+    messages_after = messages_before + (
+        {"role": "assistant", "content": "<guess>7</guess>"},
+    )  # 猜中、遊戲結束，沒有新的 user 回饋訊息
+    seg = TurnSegment(gen=gen, messages_before=messages_before, messages_after=messages_after)
+
+    completion_ids, logprobs, env_mask = build_masked_completion(tok, [seg])
+    assert completion_ids == [9, 9]
+    assert logprobs == [-0.5, -0.5]
+    assert env_mask == [1, 1]
+
+
+def test_build_masked_completion_multi_turn_concatenates_all_segments():
+    tok = _CharTokenizer()
+    m0 = (
+        {"role": "system", "content": "rules"},
+        {"role": "user", "content": "go"},
+    )
+    gen1 = TurnGen(token_ids=(1, 2), logprobs=(-0.1, -0.1), text="<guess>50</guess>")
+    m1 = m0 + (
+        {"role": "assistant", "content": "<guess>50</guess>"},
+        {"role": "user", "content": "HIGHER."},
+    )
+    gen2 = TurnGen(token_ids=(3, 4, 5), logprobs=(-0.2, -0.2, -0.2), text="<guess>75</guess>")
+    m2 = m1 + ({"role": "assistant", "content": "<guess>75</guess>"},)  # 猜中，局結束
+
+    segs = [
+        TurnSegment(gen=gen1, messages_before=m0, messages_after=m1),
+        TurnSegment(gen=gen2, messages_before=m1, messages_after=m2),
+    ]
+    completion_ids, logprobs, env_mask = build_masked_completion(tok, segs)
+
+    # 兩回合的模型生成 token 都要出現、mask=1，且順序正確（第一回合在前）
+    gen1_pos = [i for i, m in enumerate(env_mask) if m == 1][:2]
+    assert [completion_ids[i] for i in gen1_pos] == [1, 2]
+    gen2_start = completion_ids.index(3)
+    assert completion_ids[gen2_start : gen2_start + 3] == [3, 4, 5]
+    assert env_mask[gen2_start : gen2_start + 3] == [1, 1, 1]
+    # 第一回合後有回饋插入（mask=0），第二回合是最後一回合、後面沒有
+    assert 0 in env_mask[:gen2_start]
+    assert env_mask[gen2_start + 3 :] == []  # 最後一回合之後沒有更多內容

@@ -6,10 +6,20 @@
 - make_rollout_func(...)：TRL GRPOTrainer 的 rollout_func 轉接。
 - make_trl_reward_fn(...)：讀 rollout_func 轉發的 episode 統計欄位 → rewards.py 純函數。
 
-關鍵語義（與 TRL 1.8 官方 openenv Wordle 範例同構）：
-- assistant-only loss 是「結構性」的：只有模型生成的 token 進 completion_ids，
-  環境回饋只出現在重新渲染的 prompt 側，永不進 loss。
-- logprobs 是 vLLM 取樣當下的值；跨回合串接 = importance-sampling 近似（官方範例同）。
+關鍵語義（M2.1 spike 實測修正，讀 trl 原始碼確認）：
+- **assistant-only loss 用 env_mask 達成，不是把回饋文字整個排除在 completion_ids 外**：
+  早期設計（只把各回合生成 token 直接串接、回饋只進重渲染的 prompt）會讓 TRL 拿
+  `prompt_ids + completion_ids` 重新算「當下策略」的 logprobs 時，喂進去一個模型從沒
+  真正看過的假上下文（缺了回合間的環境回饋）——重要性採樣比值因此崩潰到趨近零，
+  grad_norm 恆為 0，訓練沒有任何學習訊號（M2.1 spike 實際撞到）。正確做法（見官方
+  `_tool_call_loop` 的 tool_mask 機制）：completion_ids 是**整段連續、包含回合間插入
+  文字**的真實序列，用平行的 env_mask（1=模型生成、0=環境插入）告訴 TRL 只對
+  mask=1 的位置算 loss（trl 的 rollout_func 契約支援回傳 `env_mask` 額外欄位，
+  內部當 tool_mask 用）。
+- mask=1 段落：模型真實生成的 token 原始 id/logprob（來自 vLLM 取樣，不改動）。
+- mask=0 段落：回合之間插入的東西（環境回饋文字 + chat template 角色切換的 wrapper
+  token）——事後用 tokenizer 對 `game.build_messages()` 的回合前後快照算 delta 補回來，
+  logprob 填 0.0（反正 loss 會被 mask 蓋掉，數值不重要，但 token id 必須是真的字）。
 - 答案取樣在 rollout_func 內部（seeded RNG）：同一 prompt 槽位的 num_generations 局
   共用同一個隱藏答案 → GRPO 組內比較成立。dataset 的 prompt 內容不需要攜帶答案。
 """
@@ -43,13 +53,23 @@ class TurnGen:
 GenerateFn = Callable[[list[list[dict]]], list[TurnGen]]
 
 
+@dataclass(frozen=True)
+class TurnSegment:
+    """一回合的生成結果 + 回合前後的完整 messages 快照（供事後建構 env_mask 用）。"""
+
+    gen: TurnGen
+    messages_before: tuple[dict, ...]  # 這回合生成前的完整對話
+    messages_after: tuple[dict, ...]   # game.step() 之後（含這回合 canonical assistant + 若有的回饋）
+
+
 @dataclass
 class EpisodeRollout:
-    completion_ids: list[int]
+    completion_ids: list[int]   # 原始版：純模型生成 token 串接（debug/transcript 用，不變）
     logprobs: list[float]
     stats: dict
     transcript: str
     budget_truncated: bool = False
+    segments: list[TurnSegment] = field(default_factory=list)
 
 
 def play_batch_episodes(
@@ -63,6 +83,7 @@ def play_batch_episodes(
     n = len(games)
     completions: list[list[int]] = [[] for _ in range(n)]
     logps: list[list[float]] = [[] for _ in range(n)]
+    segments: list[list[TurnSegment]] = [[] for _ in range(n)]
     truncated = [False] * n
 
     for _ in range(max_turns_hard_cap):
@@ -79,7 +100,8 @@ def play_batch_episodes(
         if not active:
             break
 
-        chats = [games[i].build_messages() for i in active]
+        pre_messages = {i: games[i].build_messages() for i in active}
+        chats = [pre_messages[i] for i in active]
         gens = generate(chats)
         if len(gens) != len(active):
             raise RuntimeError(f"generate 回傳 {len(gens)} 筆，預期 {len(active)}")
@@ -91,6 +113,13 @@ def play_batch_episodes(
             completions[i].extend(gen.token_ids)
             logps[i].extend(gen.logprobs)
             games[i].step(gen.text)
+            segments[i].append(
+                TurnSegment(
+                    gen=gen,
+                    messages_before=tuple(pre_messages[i]),
+                    messages_after=tuple(games[i].build_messages()),
+                )
+            )
 
     out = []
     for i, g in enumerate(games):
@@ -102,10 +131,62 @@ def play_batch_episodes(
                 logprobs=logps[i],
                 stats=stats,
                 transcript=g.transcript(),
+                segments=segments[i],
                 budget_truncated=truncated[i],
             )
         )
     return out
+
+
+def build_masked_completion(
+    tok: Any, segments: list[TurnSegment]
+) -> tuple[list[int], list[float], list[int]]:
+    """把逐回合 TurnSegment 轉成 TRL 要的單一連續序列 + env_mask。
+
+    mask=1 段落用模型真實生成的 token id/logprob（原始、不改動）；mask=0 段落是回合間
+    插入的東西（環境回饋文字 + chat template 角色切換 wrapper），事後用 tokenizer 對
+    messages_before/messages_after 的快照算 delta 補回來。
+
+    關鍵假設（多數 chat template 成立，含 Qwen2.5 的 ChatML 格式）：緊接在一段內容
+    後面的角色切換 wrapper token 只跟角色有關、跟內容本身無關——所以就算模型真實輸出
+    跟 canonical 化後存進歷史的文字不同，緊接其後的 wrapper/回饋 token 序列還是一樣，
+    可以放心用 canonical 版本算 delta，不用管模型原始輸出的確切字句。
+    """
+
+    def render_len(messages: tuple[dict, ...], add_generation_prompt: bool) -> int:
+        text = tok.apply_chat_template(
+            list(messages), tokenize=False, add_generation_prompt=add_generation_prompt
+        )
+        return len(tok(text, add_special_tokens=False)["input_ids"])
+
+    completion_ids: list[int] = []
+    logprobs: list[float] = []
+    env_mask: list[int] = []
+
+    for idx, seg in enumerate(segments):
+        completion_ids.extend(seg.gen.token_ids)
+        logprobs.extend(seg.gen.logprobs)
+        env_mask.extend([1] * len(seg.gen.token_ids))
+
+        is_last = idx == len(segments) - 1
+        # messages_after 前 len(messages_before)+1 筆 = messages_before + 這回合的
+        # canonical assistant 訊息（尚未加回饋）；用它跟含回饋的完整版本算 delta。
+        after_assistant_only = seg.messages_after[: len(seg.messages_before) + 1]
+        assistant_len = render_len(after_assistant_only, add_generation_prompt=False)
+        full_len = render_len(seg.messages_after, add_generation_prompt=not is_last)
+
+        gap = full_len - assistant_len
+        if gap > 0:
+            full_text = tok.apply_chat_template(
+                list(seg.messages_after), tokenize=False, add_generation_prompt=not is_last
+            )
+            full_ids = tok(full_text, add_special_tokens=False)["input_ids"]
+            feedback_ids = list(full_ids[assistant_len:full_len])
+            completion_ids.extend(feedback_ids)
+            logprobs.extend([0.0] * len(feedback_ids))  # mask=0，數值不影響 loss
+            env_mask.extend([0] * len(feedback_ids))
+
+    return completion_ids, logprobs, env_mask
 
 
 # ---------------------------------------------------------------- 監控緩衝
@@ -327,10 +408,16 @@ def make_rollout_func(
             ids = tok(initial_text, add_special_tokens=False)["input_ids"]
             prompt_ids.append(list(ids))
 
+        # 用 env_mask 版本取代原始扁平串接：completion_ids 現在是整段連續、含回合間
+        # 插入文字的真實序列，配 env_mask 告訴 TRL 只對模型真實生成的位置算 loss
+        # （見模組頂端說明；不這樣做 TRL 重算 logprobs 時上下文對不上，梯度恆為 0）。
+        masked = [build_masked_completion(tok, r.segments) for r in rollouts]
+
         out: dict[str, list] = {
             "prompt_ids": prompt_ids,
-            "completion_ids": [r.completion_ids for r in rollouts],
-            "logprobs": [r.logprobs for r in rollouts],
+            "completion_ids": [m[0] for m in masked],
+            "logprobs": [m[1] for m in masked],
+            "env_mask": [m[2] for m in masked],
             "answer_used": [str(a) for a in answers_used],
         }
         stat_keys = sorted({k for r in rollouts for k in r.stats})
