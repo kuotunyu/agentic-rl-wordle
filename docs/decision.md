@@ -119,6 +119,34 @@
 現在對每個收到的 prompt 只產生一局，每 num_generations 個連續 prompt 共用一個抽樣答案，
 並在開頭斷言 `len(prompts) % num_generations == 0`（不成立直接報錯，不默默算錯批次）。
 
+## M2.3 / M2.4 驗證記錄（2026-07-10，Colab L4，猜數字煙霧環境）
+
+**M2.4（續跑演練）：PASS，兩輪都過**，第二輪（200 步）是真正的訓練中途 SIGKILL
+（`checkpoint step=132` → 重啟接續 `step=133`），比第一輪（意外卡在訓練自然結束邊界、
+`step=60`→`61`）更扎實。斷線恢復機制確認可靠。
+
+**M2.3（學習訊號 gate）：技術上兩輪都沒過自動判定，但判斷為足夠證據，決定放行進 M3.2。**
+
+- 第一輪（60 步）：`win_rate` 前後完全打平（0.4375→0.4375）、`reward/mean` 幾乎沒動
+  （2.175→2.309）。人工檢視 `samples/step_00025.md`、`step_00050.md` 兩份 transcript：
+  沒有 reward hacking 跡象、格式健康（多數回合 `tag_ok`），但策略明顯不熟練
+  （不會用已知邊界資訊、線性搜尋沒有自適應步長、一次真的重複猜測）。判斷是
+  「60 步（480 局）樣本太少、`win_rate` 每步只從 8 條軌跡算出的粗顆粒度雜訊蓋過訊號」，
+  不是機制壞掉——依此把 `SMOKE.max_steps` 從 60 拉到 200。
+- 第二輪（200 步）：`reward/mean` 2.119→3.153（+49%，**單一條件本身已通過**）；
+  `win_rate` 0.425→0.55（+12.5 個百分點，**差 2.5 點没到我在 cell⑥ 寫死的 15 點門檻**）。
+  曲線圖後半段（step 125+）reward 峰值與 win_rate 高原明顯比前半段密集，方向確定向上。
+  15 個百分點這個數字是設計 notebook 時隨手定的、沒有實證校準基礎，不是專案規格文件
+  規定的硬數字。
+
+**決策**（使用者確認）：不再於玩具環境上加碼驗證（reward 條件已通過、win_rate 僅些微
+差門檻、resume 機制扎實、transcript 沒有作弊跡象、且已有獨立的「grad_norm 從 0→非零、
+importance_sampling_ratio 從 1e-24→0.5~0.7、reward 兩步內 1.3→4.2」這組更直接的證據
+支撐 env_mask 修法確實生效），視為足夠證據放行進 **M3.2**（真正 Wordle 環境短跑試驗，
+`PILOT_MODE=True`，`PILOT_HOURS≈1`，不評測不 push HF）。M3.2/M3.3 若在真正 Wordle 環境
+上出現類似「reward 漲但 win_rate 差一點門檻」的情況，比照本次判斷邏輯（reward 條件 +
+transcript 人工檢視）處理，不機械式卡在單一寫死的百分點數字上。
+
 ## 研究來源
 - TRL releases / GRPOTrainer docs / openenv docs（rollout_func 契約、colocate、Wordle 範例）：
   github.com/huggingface/trl、huggingface.co/docs/trl/main/en/openenv、/grpo_trainer
