@@ -1,5 +1,8 @@
 """rollout 引擎（lockstep / 串接 / 預算 / 轉發）——用 fake generate 全程 CPU 測試。"""
 
+import sys
+import types
+
 import pytest
 
 from wordle_rl.env.number_guess import NumberGuessGame
@@ -201,3 +204,68 @@ def test_rollout_func_works_with_number_game():
     assert len(out["win"]) == 2
     # 答案 50 → 一回合全勝；答案 51 → 永遠猜 50 到 7 回合敗
     assert out["win"] in ([1.0, 1.0], [0.0, 0.0])
+
+
+def _install_fake_trl_openenv(fn):
+    """把假的 trl.experimental.openenv.generate_rollout_completions 塞進 sys.modules，
+    這樣不用真的安裝 trl 也能測 _trl_generate_fn 的欄位解析邏輯（M2.1 spike 實錄的回歸測試：
+    generate_rollout_completions 回傳的欄位名不對時絕不能靜默塞空 list）。
+    """
+    trl_mod = types.ModuleType("trl")
+    experimental_mod = types.ModuleType("trl.experimental")
+    openenv_mod = types.ModuleType("trl.experimental.openenv")
+    openenv_mod.generate_rollout_completions = fn
+    trl_mod.experimental = experimental_mod
+    experimental_mod.openenv = openenv_mod
+    sys.modules["trl"] = trl_mod
+    sys.modules["trl.experimental"] = experimental_mod
+    sys.modules["trl.experimental.openenv"] = openenv_mod
+
+
+@pytest.fixture(autouse=False)
+def fake_trl_module():
+    saved = {k: sys.modules.get(k) for k in ("trl", "trl.experimental", "trl.experimental.openenv")}
+    yield _install_fake_trl_openenv
+    for k, v in saved.items():
+        if v is None:
+            sys.modules.pop(k, None)
+        else:
+            sys.modules[k] = v
+
+
+def test_trl_generate_fn_extracts_correct_fields(fake_trl_module):
+    def fake_grc(trainer, prompts, **kwargs):
+        return [
+            {"completion_ids": [1, 2, 3], "logprobs": [-0.1, -0.2, -0.3], "text": "<guess>50</guess>"}
+            for _ in prompts
+        ]
+
+    fake_trl_module(fake_grc)
+    from wordle_rl.rollout import _trl_generate_fn
+
+    gen = _trl_generate_fn(
+        FakeTrainer(), per_turn_max_tokens=16, temperature=1.0, top_p=1.0, stop=("</guess>",)
+    )
+    out = gen([[{"role": "user", "content": "hi"}]])
+    assert len(out) == 1
+    assert out[0].token_ids == (1, 2, 3)
+    assert out[0].logprobs == (-0.1, -0.2, -0.3)
+    assert out[0].text == "<guess>50</guess>"
+
+
+def test_trl_generate_fn_missing_fields_fails_loud_not_silent(fake_trl_module):
+    """迴歸測試：generate_rollout_completions 回傳欄位名對不上時必須立刻報錯附可用欄位，
+    絕不能靜默塞空 list（那會讓 GRPO 拿零長度 completion 去算 loss，在 CUDA 底層炸出
+    難懂的 index-out-of-bounds，而不是在這裡就講清楚——M2.1 spike 實際撞到的 bug）。
+    """
+    def fake_grc(trainer, prompts, **kwargs):
+        return [{"token_ids": [1, 2, 3], "logprob": [-0.1]} for _ in prompts]  # 欄位名故意錯
+
+    fake_trl_module(fake_grc)
+    from wordle_rl.rollout import SpikeValidationError, _trl_generate_fn
+
+    gen = _trl_generate_fn(
+        FakeTrainer(), per_turn_max_tokens=16, temperature=1.0, top_p=1.0, stop=("</guess>",)
+    )
+    with pytest.raises(SpikeValidationError, match="token_ids"):
+        gen([[{"role": "user", "content": "hi"}]])

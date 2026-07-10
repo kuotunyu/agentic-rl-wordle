@@ -205,12 +205,31 @@ def _trl_generate_fn(trainer, per_turn_max_tokens: int, temperature: float, top_
             for c in chats
         ]
 
+    _MISSING = object()
+
     def to_turngen(item: Any) -> TurnGen:
         # 兼容 dict / dataclass 兩種回傳形態
-        get = item.get if isinstance(item, dict) else lambda k, d=None: getattr(item, k, d)
-        ids = list(get("completion_ids") or [])
-        lps = list(get("logprobs") or [])
-        text = get("text") or tok.decode(ids, skip_special_tokens=False)
+        if isinstance(item, dict):
+            get = lambda k, d=_MISSING: item.get(k, d)  # noqa: E731
+            available = sorted(item.keys())
+        else:
+            get = lambda k, d=_MISSING: getattr(item, k, d)  # noqa: E731
+            available = sorted(a for a in dir(item) if not a.startswith("_"))
+
+        ids_raw = get("completion_ids")
+        lps_raw = get("logprobs")
+        # 欄位對不上就立刻報錯附真實可用欄位名——絕不能靜默塞空 list，
+        # 那會讓 GRPO 拿零長度 completion 去算 loss，在 CUDA 底層炸出難懂的
+        # index-out-of-bounds，而不是在這裡就講清楚問題出在哪（M2.1 spike 實錄）。
+        if ids_raw is _MISSING or lps_raw is _MISSING:
+            raise SpikeValidationError(
+                "generate_rollout_completions 單筆回傳沒有預期的 completion_ids/logprobs 欄位"
+                f"（型別={type(item).__name__}，實際可用欄位/屬性={available}）；"
+                "對照這份清單改 to_turngen() 裡的欄位名"
+            )
+        ids = list(ids_raw)
+        lps = list(lps_raw)
+        text = get("text", None) or tok.decode(ids, skip_special_tokens=False)
         return TurnGen(token_ids=tuple(ids), logprobs=tuple(lps), text=text)
 
     def generate(chats: list[list[dict]]) -> list[TurnGen]:
