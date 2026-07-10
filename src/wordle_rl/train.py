@@ -12,11 +12,35 @@ requirements-colab.txt，如有旗標差異只改本檔與 rollout.py。
 from __future__ import annotations
 
 import argparse
+import glob
 import json
+import os
 from pathlib import Path
 
 from .config import get_preset
 from .rollout import RolloutBuffers, make_rollout_func, make_trl_reward_fn
+
+
+def _fix_missing_cuda13_runtime_ld_path() -> None:
+    """已知 Colab A100 環境地雷（M2.1 spike 診斷實錄）：
+
+    vllm 0.23.0 的編譯擴充套件 vllm._C 連到 libcudart.so.13，pip 也確實裝了提供它的
+    `nvidia-cuda-runtime`（無 -cu12 尾綴＝cu13）套件，但該 .so 沒有落在動態連結器的
+    預設搜尋路徑上（不像 torch 自己的 -cu12 套件會被自動找到），import 時直接
+    ImportError。用 glob 動態找出實際路徑塞進 LD_LIBRARY_PATH——找不到就是無害 no-op，
+    不會影響沒有這個問題的環境（例如非 Colab 的本機 Linux GPU）。
+    """
+    dirs = {
+        os.path.dirname(p)
+        for p in glob.glob("/usr/**/nvidia/cu13/lib/libcudart.so.13", recursive=True)
+    }
+    if dirs:
+        os.environ["LD_LIBRARY_PATH"] = (
+            ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+        )
+
+
+_fix_missing_cuda13_runtime_ld_path()
 
 
 def find_resume_checkpoint(output_dir: Path) -> str | None:
