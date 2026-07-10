@@ -92,10 +92,13 @@ FULL = TrainPreset(
     checkpoint_minutes=30,
     sample_every_steps=50,
     dataset_rows=2048,
-    # M3.2 pilot 實測：預設 0.25 在 A100 40GB 上跑 5 步後穩定 OOM（訓練側記憶體
-    # 逐步爬升吃滿整卡）——調低給訓練側多一點餘裕，配合 train.py 的
-    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments 修法一起用。
-    vllm_gpu_memory_utilization=0.2,
+    # M3.2 pilot 實測：0.25 在 A100 40GB 上第 5 步 OOM；降到 0.2（配合 train.py 的
+    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments）撐到第 49 步才 OOM——同一種模式，
+    # 只是撐更久：批次裡偶爾出現的長生成（completions/max_length 尖峰到 100+）會讓
+    # 那一步的 padding 需求跳高，尖峰不可能完全消除，只能再往下壓給更多餘裕，
+    # 配合 cell⑥ 的自動重試機制兜底（真的又撞到尖峰就自動 --resume auto 續跑，
+    # 不會整個停擺）。
+    vllm_gpu_memory_utilization=0.15,
 )
 
 PRESETS = {"smoke": SMOKE, "full": FULL}

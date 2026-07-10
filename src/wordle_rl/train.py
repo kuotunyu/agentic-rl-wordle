@@ -207,10 +207,12 @@ def main(argv: list[str] | None = None) -> int:
         use_vllm=True,
         vllm_mode="colocate",
         vllm_gpu_memory_utilization=preset.vllm_gpu_memory_utilization,
-        # M3.2 pilot 診斷實錄：OOM 發生在 loss.backward()，此時 vLLM 的權重/KV cache
-        # 仍常駐顯存跟訓練側搶空間。開 sleep mode 讓 vLLM 在訓練階段把顯存讓出來，
-        # 下一輪生成前才 wake_up() 拿回（trl 1.8 openenv utils 已內建這個機制）。
-        vllm_enable_sleep_mode=True,
+        # ⚠️ 試過 vllm_enable_sleep_mode=True 想在反向傳播時把 vLLM 顯存讓出來，
+        # 但 M3.2 pilot 實測在 Colab 上直接炸：
+        # "cumem allocator is not supported on current platform"——
+        # 這個平台不支援 sleep mode 需要的底層機制，比原本的 OOM 更嚴重（連初始化都過不了）。
+        # 撤回，改用調低 vllm_gpu_memory_utilization + 訓練行程自動重試機制
+        # （cell⑥）來緩解偶發的記憶體尖峰。
         report_to=[],
         seed=preset.seed,
     )
