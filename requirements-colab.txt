@@ -11,4 +11,8 @@ accelerate>=1.0
 # 直接炸 libcudart.so.13 找不到——0.24.0 要 CUDA 13 runtime，跟 Colab 內建 torch cu128 的
 # CUDA 12.8 runtime 對不上）。pin 在支援區間內的最新版：
 vllm==0.23.0
+# torchao：Colab 預裝的 0.10.0 太舊，trl 1.8.0 的 vLLM 生成路徑要求 >0.16.0
+# （spike 第二輪抓到：ImportError: Found an incompatible version of torchao）。
+# 只給下界、不設上界——這是 trl 自己宣告的最低需求，讓 pip 挑最新相容版即可：
+torchao>=0.16.0
 # torch：用 Colab 內建 CUDA build，絕不 pin 覆蓋（專案 2 教訓）
