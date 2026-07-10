@@ -2,7 +2,7 @@
 
 用法：python scripts/make_colab_bundle.py
 產出 repo 根目錄的 wordle_rl_bundle.zip（gitignored），手動上傳到
-Google Drive 的 MyDrive/agentic-rl-wordle/ 供 train_colab.ipynb 解壓。
+Google Drive 的 MyDrive/agentic-rl-wordle/ 供 wordle_grpo_colab_train.ipynb 解壓。
 """
 
 from __future__ import annotations

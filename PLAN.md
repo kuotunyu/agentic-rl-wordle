@@ -93,7 +93,7 @@ Windows CPU pytest 秒級跑完；torch/transformers 只有 play.py 本機推理
 ├── tests/                       # test_env(14+案)/test_knowledge/test_protocol/test_rewards/test_words/test_number_guess
 ├── docs/decision.md             # 選型結論與研究來源
 ├── docs/rewards.md              # 獎勵量級理由與防 hacking 分析
-├── train_colab.ipynb
+├── wordle_grpo_colab_train.ipynb
 ├── data/（gitignored+.gitkeep）、results/、samples/
 └── PLAN.md、README.md、LICENSE(Apache-2.0)、.gitignore、requirements.txt、requirements-colab.txt
 ```
@@ -203,7 +203,7 @@ rollout 溫度 1.0（組內變異是 GRPO 命脈）；評測另走 greedy 路徑
 
 dataset = 1,852 train words（eval 463 永不進）；400 步 × 2 組 ≈ 800 個答案輪替。
 
-**train_colab.ipynb**（沿用專案 1/2 慣例）：①參數 cell（SMOKE_TEST、RUN_NAME、HF_USERNAME=steven0226、
+**wordle_grpo_colab_train.ipynb**（沿用專案 1/2 慣例）：①參數 cell（SMOKE_TEST、RUN_NAME、HF_USERNAME=steven0226、
 MAX_HOURS、REWARD_PRESET）→ ②解壓 Drive 的 bundle + 精確 pin 安裝（斷言 trl.__version__）→
 ③掛 Drive、CKPT_DIR=Drive/runs/{RUN_NAME} → ④userdata.get("HF_TOKEN") → ⑤`pytest -q`（<60s，抓環境漂移）→
 ⑥`subprocess.Popen([sys.executable,"-m","wordle_rl.train",...,"--resume","auto","--max-hours",...])`，

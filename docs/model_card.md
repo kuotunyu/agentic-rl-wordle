@@ -79,6 +79,6 @@ language:
 git clone <repo> && cd agentic-rl-wordle
 python scripts/fetch_words.py && pip install -e . && pytest   # 環境全綠
 python baselines/run_baseline.py --agent random               # 階段 1
-# 訓練：上傳 wordle_rl_bundle.zip 到 Drive，跑 train_colab.ipynb（SMOKE→FULL）
+# 訓練：上傳 wordle_rl_bundle.zip 到 Drive，跑 wordle_grpo_colab_train.ipynb（SMOKE→FULL）
 python play.py --answer crane --adapter <path>                # 即時觀看
 ```

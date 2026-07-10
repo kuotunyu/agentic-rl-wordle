@@ -72,7 +72,7 @@ python baselines/run_baseline.py --agent llm --backend vllm   # GPU（Colab）
 
 # 階段 2/3：訓練（Colab A100）
 python scripts/make_colab_bundle.py  # 打包原始碼 → 上傳 Drive/agentic-rl-wordle/
-# 開 train_colab.ipynb：SMOKE_TEST=True 跑煙霧 → 過 gate 後 False 跑正式（背景執行）
+# 開 wordle_grpo_colab_train.ipynb：SMOKE_TEST=True 跑煙霧 → 過 gate 後 False 跑正式（背景執行）
 
 # 評測與觀戰
 python eval/run_eval.py --adapter runs/full/final --backend vllm
