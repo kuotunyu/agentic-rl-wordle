@@ -37,12 +37,21 @@
 - 單 GPU colocate 是文件化的預設路徑：`GRPOConfig(use_vllm=True, vllm_mode="colocate",
   vllm_gpu_memory_utilization≈0.25, vllm_enable_sleep_mode=True)`。
 - `rollout_func(prompts, trainer) -> dict`（實驗性）：必要鍵 prompt_ids / completion_ids /
-  logprobs，**其他鍵轉發給 reward functions**；在 server 與 colocate 模式皆可用；
-  收到的 prompts 未依 num_generations 重複（rollout 自行回 G 條/prompt）。
-- assistant-only loss 採「結構性遮罩」：只有模型生成 token 進 completion_ids，環境回饋
-  只進重新渲染的 prompt 側。這同時繞開 Qwen2.5 模板缺 `{% generation %}`、
-  `return_assistant_tokens_mask` 靜默失效的坑。
-- 跨回合 logprobs 串接 = 取樣時值的 importance-sampling 近似——官方範例同一作法。
+  logprobs，**其他鍵轉發給 reward functions**；在 server 與 colocate 模式皆可用。
+  **⚠️ 已被 spike 推翻的研究假設**：原以為「prompts 未依 num_generations 重複」，
+  實測讀 trl 原始碼（`trl/trainer/utils.py` 的 `RepeatSampler`，
+  `mini_repeat_count=self.num_generations`）證實**恰好相反**——TRL 自己就把每個
+  dataset row 連續重複 num_generations 次才交給 rollout_func，我們不能再乘一次
+  （細節見下方 M2.1 實測記錄）。
+- assistant-only loss **不能**用「結構性排除」（只把生成 token 放進 completion_ids、
+  回饋文字整段丟掉只留在下一輪 prompt）——這個原始設計已被 spike 證明是錯的：TRL
+  訓練時要拿 `prompt_ids+completion_ids` 重新算「當下策略」logprobs，缺了回合間
+  回饋的假上下文會讓重要性採樣比值崩潰到趨近零，梯度恆為 0（看似訓練有跑，實際
+  什麼都沒學到）。正確做法是官方 `_tool_call_loop` 用的 **`env_mask`**：completion_ids
+  整段連續（含回饋文字），額外回傳 `env_mask`（1=模型生成、0=環境插入）讓 TRL 只對
+  mask=1 位置算 loss，同時餵給重算 logprobs 的是模型真正見過的上下文。
+- 跨回合同一回合內的 logprobs 是取樣時值（importance-sampling 近似）；回合間插入的
+  回饋文字沒有真實 logprob，填 0.0（反正 mask=0，loss 不會用到）。
 - 風險與對策：rollout_func 屬實驗性（簽名歷史上改過兩次）→ **精確 pin trl==1.8.0**、
   TRL 接觸面全部關進 `rollout.py` + `train.py` 兩檔；v1.0（2026-03）是 breaking release，
   任何 v0.2x 時代教學都不可直接照抄。
@@ -56,19 +65,59 @@
    我們預設 SHAPED（規格版，且組內變異能緩解早期全敗的零梯度問題），保留
    `--reward binary` 做 A/B。零變異組占比進 metrics.jsonl 監控。
 
-## M2.1 Spike（60 分鐘 timebox）檢核清單
+## M2.1 Spike（實測記錄，2026-07-10，Colab L4）
 
-在 Colab A100 執行 `python scripts/spike_trl.py`，逐項驗證：
+**結果：PASS。** 花了遠超 60 分鐘 timebox（版本漂移+一個核心邏輯 bug，逐一實測排除），
+但每個問題都有真實環境證據支撐，不是憑空猜的；過程本身驗證了「先跑最小可行流程、
+讓真實錯誤指路」這個 spike 策略是對的。
 
 | # | 驗證點 | 狀態 |
 |---|---|---|
-| A2 | `trl.experimental.openenv.generate_rollout_completions` 在 colocate 可用、接受 max_tokens/stop 覆寫 | ⬜ 待跑 |
-| B | rollout_func 收到未重複的 prompts、回 G 條/prompt 被正確分組 | ⬜ 待跑 |
-| C | 額外欄位（win/turns_used/…）轉發進 reward_fn kwargs | ⬜ 待跑 |
-| D | 一個乾淨 optimizer step、loss 有限、checkpoint 可寫 | ⬜ 待跑 |
-| — | 可用版本三元組 (torch, vllm, trl) 回填 requirements-colab.txt | ⬜ 待跑 |
+| A2 | `trl.experimental.openenv.generate_rollout_completions` 在 colocate 可用、接受 max_tokens/stop 覆寫 | ✅ 通過（欄位名 completion_ids/logprobs/text 與假設一致，讀原始碼 `trl/experimental/openenv/utils.py` 確認） |
+| B | rollout_func 收到的 prompts 語義 | ✅ 但假設錯誤已修正——見下方「已推翻的假設」 |
+| C | 額外欄位（win/turns_used/…）轉發進 reward_fn kwargs | ✅ 通過 |
+| D | 一個乾淨 optimizer step、loss 有限、checkpoint 可寫 | ✅ 通過（`grad_norm` 非零、`importance_sampling_ratio/mean` 落在 0.5~0.7 合理範圍、`reward/mean` 兩步內 1.31→4.19 有明顯進步） |
+| — | 可用版本三元組回填 requirements-colab.txt | ✅ 已 pin |
 
-**Spike 結果**：（跑完回填：PASS/FAIL、實際版本、旗標差異、修改點）
+**可用版本三元組**（已寫進 `requirements-colab.txt`）：
+`torch==2.11.0+cu128`（Colab 內建，不覆蓋）｜`vllm==0.23.0`｜`trl==1.8.0`｜
+`transformers==5.12.1`｜`peft==0.19.1`
+
+### 依序踩到並修好的坑（真實環境證據，非推測）
+
+1. **vllm 未 pin 抓到 0.24.0**：TRL 1.8.0 官方只支援 vllm 0.16.0–0.23.0，抓到最新版直接
+   `ImportError: libcudart.so.13`（見下一條）。→ pin `vllm==0.23.0`。
+2. **libcudart.so.13 找不到**：vllm 0.23.0 的編譯擴充套件 `vllm._C` 連到 CUDA13 runtime，
+   pip 也確實裝了提供它的 `nvidia-cuda-runtime`（Colab 這批套件無 `-cu12` 尾綴＝cu13 版），
+   但該 `.so` 沒進動態連結器預設搜尋路徑。**`os.environ["LD_LIBRARY_PATH"]` 在 process
+   跑起來後修改對這個 process 自己的後續 import 沒有用**（glibc 只在 process 啟動當下讀
+   一次）——第一版修法因此無效，改用 `ctypes.CDLL(path, mode=RTLD_GLOBAL)` 把 `.so`
+   強制預先載入目前 process 才真的解決（`train.py` 的 `_fix_missing_cuda13_runtime_ld_path`）。
+3. **`GRPOConfig.__init__() got an unexpected keyword argument 'max_prompt_length'`**：
+   trl 1.8.0 的 GRPOConfig 已無此欄位（用自訂 rollout_func 時 TRL 不需要另外管 prompt
+   長度）。用 `dataclasses.fields(GRPOConfig)` 現場列出真實欄位名確認，拿掉即可。
+4. **torchao 版本太舊**：Colab 預裝 0.10.0，peft 的 LoRA dispatch 要求 >0.16.0
+   （`peft/tuners/lora/torchao.py` 的 `is_torchao_available()` 檢查）。pin `torchao>=0.16.0`。
+5. **核心邏輯 bug：rollout_func 對已展開的 prompts 又乘了一次 num_generations**（見上方
+   「已推翻的假設」），導致回傳筆數是 TRL 預期的 num_generations 倍，在
+   `shuffle_sequence_dict` 的 `permute`（`v[permutation]`）階段索引越界、CUDA
+   `device-side assert triggered`。用 `CUDA_LAUNCH_BLOCKING=1` 拿到準確 Python traceback
+   才定位到 `trl/trainer/utils.py:839 permute`，再讀 `RepeatSampler` 原始碼確認真相。
+6. **核心邏輯 bug：多輪回饋文字被排除在 completion_ids 外，梯度恆為 0**（見上方
+   assistant-only loss 說明）。改用 `env_mask` 機制，回傳整段連續 completion_ids +
+   平行的 0/1 遮罩。連帶把 `max_completion_length` 拆成「原始生成預算」（控制何時停止
+   再生成下一回合）與「含回饋文字的完整預算」（餵給 GRPOConfig）兩個獨立數字
+   （`TrainPreset.raw_generation_budget` / `.max_completion_length`）。
+
+### 已推翻的假設
+
+原規格假設「prompts 是未依 num_generations 重複的原始切片」——**錯**。讀
+`trl/trainer/utils.py` 的 `RepeatSampler`（建構參數 `mini_repeat_count=num_generations`，
+文件字串範例直接畫出 `[0,0,0,1,1,1,2,2,2,...]` 這種連續重複模式）證實：TRL 自己就把
+每個底層 dataset row 連續重複 num_generations 次才交給 rollout_func，`len(prompts)`
+收到時已經等於 `generation_batch_size`（= num_generations 的整數倍）。`make_rollout_func`
+現在對每個收到的 prompt 只產生一局，每 num_generations 個連續 prompt 共用一個抽樣答案，
+並在開頭斷言 `len(prompts) % num_generations == 0`（不成立直接報錯，不默默算錯批次）。
 
 ## 研究來源
 - TRL releases / GRPOTrainer docs / openenv docs（rollout_func 契約、colocate、Wordle 範例）：
@@ -79,3 +128,8 @@
 - prime-rl 單卡：PR #971；examples/wordle（2 GPU + SFT 暖身）
 - ART 現況：github.com/OpenPipe/ART（releases、art-notebooks、issues #661/#678/#651/#469）
 - colocate 顯存機制：HF blog「No GPU left behind: co-located vLLM in TRL」
+- **M2.1 spike 現場讀的 trl==1.8.0 原始碼**（本機 `pip install --no-deps trl==1.8.0` 裝來
+  純讀源碼，不需要 GPU）：`trl/trainer/grpo_trainer.py`（`_generate`/`_prepare_inputs`/
+  `_tool_call_loop`/`RepeatSampler` 建構處）、`trl/trainer/utils.py`（`RepeatSampler`、
+  `shuffle_sequence_dict`/`permute`）、`trl/trainer/grpo_config.py`（`generation_batch_size`
+  預設值推導）、`trl/experimental/openenv/utils.py`（`generate_rollout_completions` 真實實作）
