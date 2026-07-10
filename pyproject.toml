@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wordle-rl"
+version = "0.1.0"
+description = "Agentic RL: multi-turn GRPO training of Qwen2.5-1.5B-Instruct to play Wordle"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "steven0226" }]
+# 核心套件（env/protocol/knowledge/rewards/metrics）零依賴：Windows CPU pytest 秒級可跑。
+# torch/transformers/vllm/trl 只在推理與訓練情境需要，見 extras 與 requirements-colab.txt。
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+play = ["torch", "transformers>=4.45", "peft>=0.14", "colorama>=0.4"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

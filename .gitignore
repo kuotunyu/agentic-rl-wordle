@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+build/
+dist/
+
+# 單字表：fetch-at-setup，不入 git（scripts/fetch_words.py 重抓；出處見 README 與 data/SOURCE.json）
+data/*
+!data/.gitkeep
+
+# 訓練產物
+checkpoints/
+runs/
+*.safetensors
+*.pt
+*.bin
+wordle_rl_bundle.zip
+
+# 結果目錄：markdown/json 報表要進 git，大檔不進
+results/**/*.png
+samples/*
+!samples/.gitkeep
+
+# 雜項
+.ipynb_checkpoints/
+*.log

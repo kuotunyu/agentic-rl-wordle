@@ -1,0 +1,7 @@
+# 本機開發（Windows，CPU）：核心零依賴，測試只要 pytest
+-e .
+pytest>=8
+
+# 本機想跑 play.py / transformers 推理時再裝（可選）：
+#   pip install torch --index-url https://download.pytorch.org/whl/cu121   # 有 NVIDIA GPU
+#   pip install transformers peft colorama
