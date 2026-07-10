@@ -70,7 +70,11 @@ SMOKE = TrainPreset(
     max_completion_length=1024,  # 7×(64+48)=784 的原始+回饋預算，留餘裕到 1024
     per_turn_max_tokens=64,
     game_max_turns=7,          # number_guess 上限 7 回合
-    max_steps=60,
+    # 60 步（480 局）在 M2.3 gate 實測時雜訊蓋過訊號：win_rate 每步只從 8 條軌跡算出、
+    # 粗顆粒度（0/8, 1/8, ...）震盪劇烈，60 步統計上看不出趨勢。人工核對 samples/
+    # transcript 確認沒有 reward hacking、格式健康，判斷是量不夠而非機制壞掉，
+    # 拉長到 200 步（1600 局）換取更有統計意義的曲線。
+    max_steps=200,
     checkpoint_minutes=10,
     sample_every_steps=25,
     dataset_rows=512,
