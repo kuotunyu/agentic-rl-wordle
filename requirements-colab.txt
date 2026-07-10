@@ -1,10 +1,14 @@
 # Colab（A100）訓練環境精確 pin。
-# ⚠️ 版本三元組 (torch, vllm, trl) 以 M2.1 spike 實測為準——spike 通過後把可用組合固定在這裡。
-# 初始候選（依 2026-07-10 查證：TRL v1.8.0 官方 openenv Wordle 範例即單 GPU colocate）：
+# 版本三元組已由 M2.1 spike 實測校正（2026-07 spike run，torch/trl/transformers/peft 皆確認可行）：
+#   torch==2.11.0+cu128（Colab 內建 CUDA build，不覆蓋）| trl==1.8.0 |
+#   transformers==5.12.1 | peft==0.19.1
 trl==1.8.0
-peft>=0.14
+peft==0.19.1
 transformers>=4.51
 datasets>=3.0
 accelerate>=1.0
-# vllm：以 TRL 1.8.0 setup.py 對應的 pin 為準（spike 時 pip install trl[vllm]==1.8.0 並記錄解出的版本）
+# vllm：TRL 1.8.0 官方僅支援 0.16.0–0.23.0（spike 第一輪不 pin 時抓到最新 0.24.0，
+# 直接炸 libcudart.so.13 找不到——0.24.0 要 CUDA 13 runtime，跟 Colab 內建 torch cu128 的
+# CUDA 12.8 runtime 對不上）。pin 在支援區間內的最新版：
+vllm==0.23.0
 # torch：用 Colab 內建 CUDA build，絕不 pin 覆蓋（專案 2 教訓）
