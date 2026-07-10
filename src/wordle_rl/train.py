@@ -62,6 +62,21 @@ def _fix_missing_cuda13_runtime_ld_path() -> None:
 _fix_missing_cuda13_runtime_ld_path()
 
 
+def _fix_cuda_memory_fragmentation() -> None:
+    """已知 Colab 環境地雷（M3.2 pilot 診斷實錄）：Wordle 多輪訓練幾步後穩定 OOM——
+    記憶體用量逐步爬升到吃滿整張卡才炸（L4 22GB 第 1 步炸、A100 40GB 第 5 步炸，
+    同一種爬升模式只是卡越大撐越多步），符合典型 CUDA allocator 碎片化症狀
+    （PyTorch 官方錯誤訊息本身建議這個環境變數）。必須在任何 CUDA 操作發生前設定
+    才有效（PyTorch 的 allocator 在首次用到 CUDA 時才讀取這個環境變數初始化，
+    跟 LD_LIBRARY_PATH 那種連結器啟動當下才讀一次的情況不同，這裡用 os.environ
+    設定是有效的）。
+    """
+    os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+
+
+_fix_cuda_memory_fragmentation()
+
+
 def find_resume_checkpoint(output_dir: Path) -> str | None:
     """--resume auto：取 step 最大且 trainer_state.json 完好的 checkpoint；壞則退次新。"""
     candidates = []

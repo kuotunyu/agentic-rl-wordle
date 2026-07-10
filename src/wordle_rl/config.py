@@ -92,6 +92,10 @@ FULL = TrainPreset(
     checkpoint_minutes=30,
     sample_every_steps=50,
     dataset_rows=2048,
+    # M3.2 pilot 實測：預設 0.25 在 A100 40GB 上跑 5 步後穩定 OOM（訓練側記憶體
+    # 逐步爬升吃滿整卡）——調低給訓練側多一點餘裕，配合 train.py 的
+    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments 修法一起用。
+    vllm_gpu_memory_utilization=0.2,
 )
 
 PRESETS = {"smoke": SMOKE, "full": FULL}
