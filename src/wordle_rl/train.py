@@ -22,22 +22,41 @@ from .rollout import RolloutBuffers, make_rollout_func, make_trl_reward_fn
 
 
 def _fix_missing_cuda13_runtime_ld_path() -> None:
-    """已知 Colab A100 環境地雷（M2.1 spike 診斷實錄）：
+    """已知 Colab A100 環境地雷（M2.1 spike 診斷實錄，第二版修法）：
 
     vllm 0.23.0 的編譯擴充套件 vllm._C 連到 libcudart.so.13，pip 也確實裝了提供它的
     `nvidia-cuda-runtime`（無 -cu12 尾綴＝cu13）套件，但該 .so 沒有落在動態連結器的
-    預設搜尋路徑上（不像 torch 自己的 -cu12 套件會被自動找到），import 時直接
-    ImportError。用 glob 動態找出實際路徑塞進 LD_LIBRARY_PATH——找不到就是無害 no-op，
-    不會影響沒有這個問題的環境（例如非 Colab 的本機 Linux GPU）。
+    預設搜尋路徑上。
+
+    第一版修法（只設 os.environ["LD_LIBRARY_PATH"]）**在真實 Colab 環境驗證失敗**：
+    LD_LIBRARY_PATH 只在 process 啟動當下被動態連結器讀取一次，process 跑起來後
+    用 os.environ 改它對「目前這個 process 自己」後續的 import/dlopen 沒有作用。
+    真正有效的做法：用 ctypes.CDLL(..., RTLD_GLOBAL) 把 .so 直接預先載入目前 process
+    ——之後任何 import 觸發的 dlopen 找同名庫，連結器會直接命中已載入的這份，
+    不需要再查路徑。同時仍然設 LD_LIBRARY_PATH，讓 vllm 自己可能 fork/spawn 出的
+    子行程（張量平行/多工作行程，全新 exec 啟動）也能正確讀到路徑。
+
+    找不到 .so 時整個函式是無害 no-op，不影響沒有這個問題的環境
+    （例如非 Colab 的本機 Linux GPU）。
     """
     dirs = {
         os.path.dirname(p)
         for p in glob.glob("/usr/**/nvidia/cu13/lib/libcudart.so.13", recursive=True)
     }
-    if dirs:
-        os.environ["LD_LIBRARY_PATH"] = (
-            ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
-        )
+    if not dirs:
+        return
+    os.environ["LD_LIBRARY_PATH"] = (
+        ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+    )
+    import ctypes
+
+    for d in dirs:
+        so_path = os.path.join(d, "libcudart.so.13")
+        if os.path.exists(so_path):
+            try:
+                ctypes.CDLL(so_path, mode=ctypes.RTLD_GLOBAL)
+            except OSError:
+                pass
 
 
 _fix_missing_cuda13_runtime_ld_path()
