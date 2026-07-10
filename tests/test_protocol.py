@@ -88,6 +88,24 @@ def test_constraint_summary_empty_knowledge():
     assert render_constraint_summary(Knowledge()) == ""
 
 
+def test_constraint_summary_exact_count_survives_green_coverage():
+    """對抗性審查確認的缺陷：exactly N 是上界，綠位傳達不了，必須永遠明示。
+
+    eerie vs crane → XXYXG：exact e=1 且 e 有 1 個綠位——舊邏輯會把
+    「恰好一個 e」吃掉，讓 there/theme 這類雙 e 詞看似與摘要一致。
+    """
+    k = Knowledge()
+    k.update("eerie", score_guess("eerie", "crane"))  # XXYXG
+    s = render_constraint_summary(k)
+    assert "e (exactly 1)" in s
+    assert not k.is_consistent("there")  # 摘要現在與 tracker 一致地排除雙 e 詞
+
+    k2 = Knowledge()
+    k2.update("eerie", score_guess("eerie", "elite"))  # GXXYG：exact e=2、兩個綠 e
+    s2 = render_constraint_summary(k2)
+    assert "e (exactly 2)" in s2
+
+
 def test_canonical_assistant():
     ok = mk_record(1, "crane", "GYXXY", raw="thinking... <guess>crane</guess>")
     assert canonical_assistant(ok) == "<guess>crane</guess>"

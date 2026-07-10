@@ -49,7 +49,8 @@ def test_aggregate_basic():
         "dolly",
         [
             mk_turn(1, "zzzzz", ILLEGAL, parse_outcome="fallback_word"),
-            mk_turn(2, "speed", "XXXXY"),
+            # ILLEGAL 回合不揭露資訊 → turn 2 出手前知識仍為空
+            mk_turn(2, "speed", "XXXXY", had_info=False),
             mk_turn(3, "speed", "XXXXY", is_repeat=True, violations=("reuses_absent_letter",)),
         ],
     )
@@ -58,13 +59,31 @@ def test_aggregate_basic():
     assert m.win_rate == 0.5
     assert m.avg_guesses_on_wins == 2.0
     assert m.total_turns == 5
+    # 規格 union 口徑：turn1 既非 tag_ok 也是環境非法 → 1/5
     assert m.illegal_rate == pytest.approx(1 / 5)
+    assert m.env_illegal_rate == pytest.approx(1 / 5)
     assert m.tag_ok_rate == pytest.approx(4 / 5)
-    # 有資訊回合 = turn>1 的 3 個；其中 1 個 reuses_absent_letter
-    assert m.turns_with_info == 3
-    assert m.absent_reuse_rate == pytest.approx(1 / 3)
+    # 有資訊回合 = win_ep turn2 + loss_ep turn3；其中 1 個 reuses_absent_letter
+    assert m.turns_with_info == 2
+    assert m.absent_reuse_rate == pytest.approx(1 / 2)
     assert m.green_break_rate == 0.0
     assert m.repeat_rate == pytest.approx(1 / 5)
+
+
+def test_illegal_rate_union_catches_tagless_format_collapse():
+    """格式崩潰不可隱形：全 fallback_word（合法詞、無 tag）→ 非法率必須是 100%。"""
+    ep = EpisodeStats.from_turns(
+        "crane",
+        [
+            mk_turn(1, "slate", "XXGXG", parse_outcome="fallback_word"),
+            mk_turn(2, "paper", "XYXXX", parse_outcome="fallback_word"),
+        ],
+    )
+    m = aggregate([ep])
+    assert m.illegal_rate == 1.0        # union 口徑
+    assert m.env_illegal_rate == 0.0    # 環境層面全合法
+    assert m.tag_ok_rate == 0.0
+    assert m.as_row()["illegal_rate"] == "100.0%"
 
 
 def test_aggregate_no_wins_avg_guesses_none():

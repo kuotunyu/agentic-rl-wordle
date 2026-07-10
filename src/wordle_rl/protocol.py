@@ -75,13 +75,15 @@ def render_constraint_summary(k: "Knowledge") -> str:
         green_counts[letter] = green_counts.get(letter, 0) + 1
     for letter in sorted(set(k.min_counts) | {c for c, n in k.exact_counts.items() if n > 0}):
         exact = k.exact_counts.get(letter)
-        known = exact if exact is not None else k.min_counts.get(letter, 0)
-        if known <= green_counts.get(letter, 0):
-            continue  # 已由綠位完整呈現，不重複列
-        if exact is not None:
+        if exact is not None and exact > 0:
+            # 上界資訊綠位傳達不了（綠位只是下界）——永遠明示 exactly N，
+            # 否則重複字母殘局的關鍵限制會從摘要消失（對抗性審查確認的缺陷）
             contains.append(f"{letter} (exactly {exact})")
-        else:
-            contains.append(f"{letter} (at least {known})")
+            continue
+        known = k.min_counts.get(letter, 0)
+        if known <= green_counts.get(letter, 0):
+            continue  # 純下界且已由綠位完整呈現 → 不重複列
+        contains.append(f"{letter} (at least {known})")
     if contains:
         parts.append("contains: " + ", ".join(contains))
 
