@@ -153,7 +153,6 @@ def main(argv: list[str] | None = None) -> int:
         per_device_train_batch_size=preset.per_device_batch,
         gradient_accumulation_steps=preset.grad_accum,
         num_generations=preset.num_generations,
-        max_prompt_length=preset.max_prompt_length,
         max_completion_length=preset.max_completion_length,
         learning_rate=preset.learning_rate,
         beta=preset.beta,

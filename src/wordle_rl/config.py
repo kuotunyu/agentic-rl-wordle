@@ -26,7 +26,6 @@ class TrainPreset:
     num_generations: int = 8       # 同答案一組
     per_device_batch: int = 8      # = num_generations → 1 組/micro-batch
     grad_accum: int = 1
-    max_prompt_length: int = 512
     max_completion_length: int = 512   # 整局 token 預算
     per_turn_max_tokens: int = 64
     temperature: float = 1.0       # rollout 探索溫度（評測另走 greedy 路徑）
