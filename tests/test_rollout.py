@@ -9,6 +9,7 @@ from wordle_rl.env.number_guess import NumberGuessGame
 from wordle_rl.games import WordleGame
 from wordle_rl.rollout import (
     RolloutBuffers,
+    SpikeValidationError,
     TurnGen,
     make_answer_sampler,
     make_rollout_func,
@@ -131,12 +132,16 @@ def test_make_rollout_func_group_semantics():
         buffers=buffers,
         generate_fn_factory=fake_gen_factory,
     )
-    out = fn(["p0", "p1"], FakeTrainer())
+    # 模擬 TRL RepeatSampler 已展開好的批次：每個底層 prompt 連續重複 num_generations 次
+    # （trl/trainer/utils.py RepeatSampler 文件字串 mini_repeat_count 語意確認）——
+    # rollout_func 不能再自己乘一次，一一對應才是正確契約。
+    prompts = ["p0"] * 4 + ["p1"] * 4
+    out = fn(prompts, FakeTrainer())
 
-    n = 2 * 4
+    n = len(prompts)
     for key in ("prompt_ids", "completion_ids", "logprobs", "win", "turns_used", "answer_used"):
         assert len(out[key]) == n, key
-    # 同組共用同一答案；兩組答案不同（sampler 每 epoch 全覆蓋）
+    # 同組（連續 4 個）共用同一答案；跨組答案不同（sampler 每 epoch 全覆蓋）
     assert len(set(out["answer_used"][:4])) == 1
     assert len(set(out["answer_used"][4:])) == 1
     assert set(out["answer_used"]) == {"crane", "slate"}
@@ -144,6 +149,23 @@ def test_make_rollout_func_group_semantics():
     snap = buffers.snapshot_metrics()
     assert "rollout/win_rate" in snap
     assert buffers.sample_transcripts(2)
+
+
+def test_make_rollout_func_rejects_non_multiple_of_num_generations():
+    """TRL 契約：len(prompts) 必須是 num_generations 的整數倍（RepeatSampler 保證此不變量）；
+    不成立時要立刻報錯，不能默默算出數量錯誤的批次去撞 TRL 內部的 shuffle/reshape
+    （M2.1 spike 實際撞到的 CUDA index-out-of-bounds 根因）。
+    """
+    fn = make_rollout_func(
+        game_factory=lambda ans: WordleGame(ans, LEGAL),
+        answers=["crane"],
+        num_generations=4,
+        per_turn_max_tokens=32,
+        max_total_tokens=256,
+        seed=1,
+    )
+    with pytest.raises(SpikeValidationError, match="num_generations"):
+        fn(["p0", "p1"], FakeTrainer())  # 2 不是 4 的倍數
 
 
 def test_make_trl_reward_fn_wordle_shaped_and_zero_variance():
@@ -200,7 +222,8 @@ def test_rollout_func_works_with_number_game():
         seed=3,
         generate_fn_factory=fake_gen_factory,
     )
-    out = fn(["p0"], FakeTrainer())
+    # 模擬 RepeatSampler 已展開好的一組（2 個一樣的 prompt = num_generations）
+    out = fn(["p0", "p0"], FakeTrainer())
     assert len(out["win"]) == 2
     # 答案 50 → 一回合全勝；答案 51 → 永遠猜 50 到 7 回合敗
     assert out["win"] in ([1.0, 1.0], [0.0, 0.0])

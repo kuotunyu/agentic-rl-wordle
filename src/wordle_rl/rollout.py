@@ -270,22 +270,35 @@ def make_rollout_func(
 ):
     """建 TRL rollout_func(prompts, trainer) -> dict。
 
-    【M2.1 spike 驗證點】TRL 1.8 契約（研究確認，仍屬實驗性）：
-    - prompts 是「未依 num_generations 重複」的原始切片 → 本函數自行對每個 prompt
-      跑 num_generations 局（同答案），回傳數量 = len(prompts) × num_generations。
+    【M2.1 spike 實測修正】TRL 1.8 真實契約（trl/trainer/utils.py 的 RepeatSampler +
+    grpo_trainer.py 的 sampler 建構參數 mini_repeat_count=num_generations 已讀原始碼確認，
+    推翻了規格原先「prompts 未依 num_generations 重複」的研究假設）：
+    - **prompts 已經是 TRL 用 RepeatSampler 展開好的完整批次**：每個底層 dataset row
+      被連續重複 num_generations 次才送進來，len(prompts) 已等於 generation_batch_size
+      （= num_generations 的整數倍）。本函數只能對每個收到的 prompt 產生「一局」，
+      每 num_generations 個連續 prompt 共用「一個」抽樣答案——絕不能再乘一次
+      num_generations，否則回傳筆數是 TRL 預期的 num_generations 倍，會在
+      shuffle_sequence_dict 的 permute 階段索引越界（M2.1 spike 實際撞到的 CUDA crash）。
     - 必要鍵：prompt_ids / completion_ids / logprobs；其他鍵轉發給 reward functions。
     """
     sampler = make_answer_sampler(answers, seed=seed)
     gen_factory = generate_fn_factory or _trl_generate_fn
 
     def rollout_func(prompts: list, trainer) -> dict:
+        if len(prompts) % num_generations != 0:
+            raise SpikeValidationError(
+                f"收到 {len(prompts)} 個 prompts，不是 num_generations={num_generations} 的整數倍"
+                "——TRL 的 RepeatSampler 契約假設不成立，檢查 GRPOConfig 的 "
+                "generation_batch_size / per_device_train_batch_size 設定"
+            )
         games: list[TurnBasedGame] = []
         answers_used: list[Any] = []
-        for _ in prompts:
-            ans = sampler()
-            for _ in range(num_generations):
-                games.append(game_factory(ans))
-                answers_used.append(ans)
+        ans: Any = None
+        for i in range(len(prompts)):
+            if i % num_generations == 0:
+                ans = sampler()  # 每 num_generations 個連續 prompt 共用一個答案
+            games.append(game_factory(ans))
+            answers_used.append(ans)
 
         generate = gen_factory(
             trainer,
@@ -304,15 +317,15 @@ def make_rollout_func(
             buffers.record_rollouts(rollouts)
 
         tok = trainer.processing_class
+        # 開局 messages 不含答案資訊，同組（甚至跨組）內容都相同，但仍逐一 tokenize
+        # 以維持 len(prompt_ids) == len(games) == len(prompts) 的一一對應。
         prompt_ids: list[list[int]] = []
-        for i, _ in enumerate(prompts):
-            game0 = games[i * num_generations]
-            # 各 episode 的初始 prompt 相同（同答案組共用），逐組 tokenize 一次
+        for game in games:
             initial_text = tok.apply_chat_template(
-                _initial_messages(game0), tokenize=False, add_generation_prompt=True
+                _initial_messages(game), tokenize=False, add_generation_prompt=True
             )
             ids = tok(initial_text, add_special_tokens=False)["input_ids"]
-            prompt_ids.extend([list(ids)] * num_generations)
+            prompt_ids.append(list(ids))
 
         out: dict[str, list] = {
             "prompt_ids": prompt_ids,
