@@ -207,6 +207,10 @@ def main(argv: list[str] | None = None) -> int:
         use_vllm=True,
         vllm_mode="colocate",
         vllm_gpu_memory_utilization=preset.vllm_gpu_memory_utilization,
+        # M3.2 pilot 診斷實錄：OOM 發生在 loss.backward()，此時 vLLM 的權重/KV cache
+        # 仍常駐顯存跟訓練側搶空間。開 sleep mode 讓 vLLM 在訓練階段把顯存讓出來，
+        # 下一輪生成前才 wake_up() 拿回（trl 1.8 openenv utils 已內建這個機制）。
+        vllm_enable_sleep_mode=True,
         report_to=[],
         seed=preset.seed,
     )
