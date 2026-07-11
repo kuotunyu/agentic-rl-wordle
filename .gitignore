@@ -27,3 +27,6 @@ samples/*
 # 雜項
 .ipynb_checkpoints/
 *.log
+
+# 個人筆記：面試複習用，不公開
+interview.md
