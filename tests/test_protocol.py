@@ -1,9 +1,12 @@
 """parser 三態、線索摘要渲染、build_messages 的歷史不可變性。"""
 
-from wordle_rl.env.wordle import ILLEGAL, score_guess
+import re
+
+from wordle_rl.env.wordle import ILLEGAL, WORD_LEN, score_guess
 from wordle_rl.episode import TurnRecord
 from wordle_rl.knowledge import Knowledge
 from wordle_rl.protocol import (
+    _TURN_INSTRUCTION,
     SYSTEM_PROMPT,
     build_messages,
     canonical_assistant,
@@ -48,6 +51,19 @@ def test_parse_fallback_last_five_letter_word():
 def test_parse_no_parse():
     r = parse_guess("I do not know.")
     assert (r.guess, r.outcome) == (None, "no_parse")
+
+
+def test_format_example_placeholder_is_a_real_five_letter_word():
+    """M3.2 pilot 實測發現：SYSTEM_PROMPT/_TURN_INSTRUCTION 曾用字面 'word'（4 字母）
+    當格式範例，每回合重複出現，模型學到的是範例的「字母數」而非規則本身——
+    transcript 裡大量 no_parse 猜測剛好是 4 字母詞（girl/zone/leak/pool/...），
+    與 'word' 的長度可疑地一致。範例本身必須是真正的 5 字母詞，防止同類 regression。
+    """
+    for text in (SYSTEM_PROMPT, _TURN_INSTRUCTION):
+        examples = re.findall(r"<guess>\s*([a-zA-Z]+)\s*</guess>", text)
+        assert examples, f"找不到 <guess>...</guess> 範例：{text!r}"
+        for word in examples:
+            assert len(word) == WORD_LEN, f"格式範例 {word!r} 不是 {WORD_LEN} 字母，會誤導模型"
 
 
 # ---------- 摘要與訊息渲染 ----------

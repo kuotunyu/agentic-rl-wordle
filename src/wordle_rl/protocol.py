@@ -28,9 +28,9 @@ After each guess you receive feedback, one mark per letter position:
 Rules:
 - Every guess must be a valid 5-letter English word.
 - An invalid word or a badly formatted reply wastes a turn.
-- Think briefly if needed (at most two short sentences), then output exactly one guess formatted as <guess>word</guess>. Never output more than one <guess> tag."""
+- Think briefly if needed (at most two short sentences), then output exactly one guess formatted as <guess>crane</guess>. Never output more than one <guess> tag."""
 
-_TURN_INSTRUCTION = "Turn {turn} of {max_turns}. Output your guess as <guess>word</guess>."
+_TURN_INSTRUCTION = "Turn {turn} of {max_turns}. Output your guess as <guess>crane</guess> (a real 5-letter word)."
 
 _GUESS_TAG_RE = re.compile(r"<guess>\s*([a-zA-Z]+)\s*</guess>", re.IGNORECASE)
 _TAG_MARKUP_RE = re.compile(r"</?\s*guess\s*>", re.IGNORECASE)
