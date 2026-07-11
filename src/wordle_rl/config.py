@@ -28,7 +28,8 @@ class TrainPreset:
     warmup_steps: int = 10
     # GRPO
     num_generations: int = 8       # 同答案一組
-    per_device_batch: int = 8      # = num_generations → 1 組/micro-batch
+    per_device_batch: int = 8      # micro-batch 大小；與組大小「獨立」——TRL 的組 advantage 在
+                                   # 生成階段就算完才切 micro-batch，唯一約束見 __post_init__
     grad_accum: int = 1
     max_completion_length: int = 1024  # 整局 token 預算（含回合間插入的回饋文字）
     per_turn_max_tokens: int = 64
@@ -59,8 +60,17 @@ class TrainPreset:
                 f"{self.feedback_overhead_per_turn}) = {needed} > {self.max_completion_length}"
                 "（含回饋文字後可能在局中截斷）"
             )
-        if self.per_device_batch % self.num_generations != 0:
-            raise ValueError("per_device_batch 必須是 num_generations 的倍數（組不可跨 micro-batch）")
+        # TRL 1.8 實碼驗證（grpo_config.py:1088-1094）：整除約束掛在「生成批」
+        # generation_batch_size = per_device_batch × grad_accum（× world_size）上，
+        # 不是 per_device_batch 本身。組內 advantage 於生成時對整個生成批算完
+        # 才切 micro-batch（grpo_trainer.py _prepare_inputs），組跨 micro-batch 是
+        # TRL 的正常運作模式——舊版檢查「per_device_batch % num_generations」是
+        # 過度限制，會擋掉合法的 4×4 配置（首次 FULL 訓練 OOM 修正需要它）。
+        if (self.per_device_batch * self.grad_accum) % self.num_generations != 0:
+            raise ValueError(
+                "生成批（per_device_batch × grad_accum）必須是 num_generations 的倍數"
+                "（TRL 對 generation_batch_size 的整除約束）"
+            )
 
 
 SMOKE = TrainPreset(
@@ -84,20 +94,31 @@ FULL = TrainPreset(
     name="full",
     game="wordle",
     beta=0.01,
-    grad_accum=2,              # 2 組 = 16 局/optimizer step
+    # ---- OOM 根因修正（首次 FULL 訓練 6 連炸的實測診斷）----
+    # 崩潰點永遠在 loss.backward() 要求 7.2~7.36 GiB：反推 = micro-batch 8 ×
+    # 序列 ~1600（prompt + 含回饋的 completion 逼近 1536 上限）× 詞彙表 151,936
+    # × 4 bytes 的 fp32 logits 級張量，數學誤差 ±2%。碎片化/洩漏/vLLM 增長等
+    # 對立假說已逐一對照 log 排除（崩潰步數 14~159 隨機、reserved 未用僅 ~200MB、
+    # 要求大小恆定）。修法：micro-batch 8→4、grad_accum 2→4——生成批仍是 16 局
+    # = 2 組/optimizer step，TRL 的組 advantage 在生成時算完才切 micro-batch，
+    # 訓練數學完全等價，但所有 batch 比例的張量峰值砍半（峰值估 ~44GB → ~27GB）。
+    # 搭配 Colab A100「大量 RAM」開 80GB 卡（該開關切的是 40/80GB 顯卡）雙保險。
+    per_device_batch=4,
+    grad_accum=4,              # 4 micro-batch × 4 = 16 局/optimizer step（仍 2 組/步）
     max_completion_length=1536,  # 6×(160+48)=1248 的原始+回饋預算，留餘裕到 1536
     per_turn_max_tokens=160,
     game_max_turns=6,
-    max_steps=400,             # --max-hours 8 兜底；sec/step 於 M3.2 實測校正
-    checkpoint_minutes=30,
+    # 首次 FULL 實測 ~4.5-5 秒/optimizer step（原估 60-120 秒嚴重高估——rollout 比
+    # 想像便宜，模型每局實際只生成 ~50 token）。400 步約半小時就結束，對不起開
+    # 8 小時的機器；校正到 3000 步（約 4-5 小時），--max-hours 8 仍是硬兜底。
+    max_steps=3000,
+    # 六次 OOM 全部從第 0 步重來的原因：崩潰都發生在第一個 checkpoint（30 分鐘）
+    # 之前，--resume auto 無檔可續。縮到 10 分鐘讓自動重啟真的有意義。
+    checkpoint_minutes=10,
     sample_every_steps=50,
     dataset_rows=2048,
-    # M3.2 pilot 實測：0.25 在 A100 40GB 上第 5 步 OOM；降到 0.2（配合 train.py 的
-    # PYTORCH_CUDA_ALLOC_CONF=expandable_segments）撐到第 49 步才 OOM——同一種模式，
-    # 只是撐更久：批次裡偶爾出現的長生成（completions/max_length 尖峰到 100+）會讓
-    # 那一步的 padding 需求跳高，尖峰不可能完全消除，只能再往下壓給更多餘裕，
-    # 配合 cell⑥ 的自動重試機制兜底（真的又撞到尖峰就自動 --resume auto 續跑，
-    # 不會整個停擺）。
+    # vllm_gpu_memory_utilization 歷程：0.25 → 第 5 步 OOM；0.2 → 第 49 步 OOM；
+    # 0.15 + 上面的 micro-batch 砍半 = 根因修正後的最終組合。
     vllm_gpu_memory_utilization=0.15,
 )
 

@@ -22,7 +22,12 @@ def test_full_preset_values_match_plan():
     assert FULL.game == "wordle" and FULL.num_generations == 8
     assert FULL.beta == pytest.approx(0.01)
     assert FULL.max_completion_length == 1536 and FULL.per_turn_max_tokens == 160
-    assert FULL.checkpoint_minutes == 30 and FULL.sample_every_steps == 50
+    # 首次 FULL 訓練 OOM 修正：micro-batch 4×accum 4 = 生成批 16 = 2 組/步不變；
+    # checkpoint 縮到 10 分鐘（六次崩潰全發生在首個 30 分 checkpoint 前，resume 無檔可續）
+    assert FULL.per_device_batch == 4 and FULL.grad_accum == 4
+    assert FULL.per_device_batch * FULL.grad_accum == 2 * FULL.num_generations
+    assert FULL.checkpoint_minutes == 10 and FULL.sample_every_steps == 50
+    assert FULL.max_steps == 3000  # 實測 ~5 秒/步後的校正值（原 400 步半小時就跑完）
 
 
 def test_get_preset_override_and_validation():
@@ -32,6 +37,12 @@ def test_get_preset_override_and_validation():
         get_preset("nope")
     with pytest.raises(ValueError):
         get_preset("full", per_turn_max_tokens=1024)  # 6×(1024+48) 遠超 1536 預算爆炸
+    # 生成批整除約束（TRL generation_batch_size % num_generations == 0）：
+    # micro-batch 可以小於組大小（FULL 的 4×4=16 ✓），但生成批不是組的倍數要擋下
+    with pytest.raises(ValueError):
+        get_preset("smoke", per_device_batch=4)  # 4×1 = 4 不是 8 的倍數
+    ok = get_preset("smoke", per_device_batch=4, grad_accum=2)  # 4×2 = 8 ✓
+    assert ok.per_device_batch * ok.grad_accum == ok.num_generations
 
 
 def test_find_resume_checkpoint(tmp_path):
