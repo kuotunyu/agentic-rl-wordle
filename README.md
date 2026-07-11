@@ -55,7 +55,7 @@ flowchart LR
 
 ※ heuristic 看得到完整答案表（Wordle solver 常規），是參照上界、不是公平對手。
 完整表與逐局記錄：[results/baselines.md](results/baselines.md)、
-最終報告：`runs/wordle-grpo-v3/results/final_report.md`（Drive）。
+最終報告：[results/final_report.md](results/final_report.md)（含 5 局代表性 transcript）。
 
 **紅線判讀（如實陳述）**：三項成功判準中——(1) **格式錯誤率塌陷 ✅**：未訓練 base 在此
 協定下 100% 回合非法（一手合法棋都下不出來），訓練後 0.3%，tag 遵循率 0%→99.7%，
