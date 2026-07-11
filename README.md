@@ -39,10 +39,10 @@ flowchart LR
 
 | 階段 | 內容 | Gate | 狀態 |
 |---|---|---|---|
-| 0 | 環境 + 協定 + 線索追蹤（純 CPU） | pytest 全綠（重複字母 14 案預驗證表） | ✅ 110+ tests |
-| 1 | 三條 baseline（200 個 held-out 詞） | results/baselines.md 真實數字 | ✅ random/heuristic；LLM 待 Colab |
-| 2 | 選型 spike + 猜數字煙霧訓練 | 20–30 分鐘內學習曲線上升 | ⬜ Colab |
-| 3 | Wordle 正式訓練（A100 過夜）+ 前後對照評測 | 勝率顯著超過未訓練 baseline（CI 佐證） | ⬜ Colab |
+| 0 | 環境 + 協定 + 線索追蹤（純 CPU） | pytest 全綠（重複字母 14 案預驗證表） | ✅ 118 tests |
+| 1 | 三條 baseline（200 個 held-out 詞） | results/baselines.md 真實數字 | ✅ 全部完成 |
+| 2 | 選型 spike + 猜數字煙霧訓練 | 20–30 分鐘內學習曲線上升 | ✅ reward +49%（200 步） |
+| 3 | Wordle 正式訓練（A100 80GB，3000 步）+ 前後對照評測 | 勝率顯著超過未訓練 baseline（CI 佐證） | ✅ 訓練完成；勝率項見下方誠實判讀 |
 
 ## 目前成果（真實執行；勝率附 Wilson 95% CI）
 
@@ -50,13 +50,19 @@ flowchart LR
 |---|---|---|---|---|---|
 | random（12,972 合法詞均勻抽） | 0.0% [0.0, 1.9] | — | 0.0% | 87.4% | 57.8% |
 | heuristic（位置頻率 + 線索過濾）※ | **99.5% [97.2, 99.9]** | 3.56 | 0.0% | 0.0% | 0.0% |
-| qwen2.5-1.5b-instruct（未訓練） | ⬜ 待 Colab | | | | |
-| qwen2.5-1.5b **+ GRPO LoRA** | ⬜ 待訓練 | | | | |
+| qwen2.5-1.5b-instruct（未訓練） | 0.0% [0.0, 1.9] | — | **100.0%** | — | — |
+| qwen2.5-1.5b **+ GRPO LoRA** | **2.0% [0.8, 5.0]** | 5.25 | **0.3%** | 57.5% | 46.2% |
 
 ※ heuristic 看得到完整答案表（Wordle solver 常規），是參照上界、不是公平對手。
-完整表與逐局記錄：[results/baselines.md](results/baselines.md)。
-成功判準（紅線）：訓練後**勝率顯著超過未訓練 baseline**＋格式錯誤率塌陷＋違限率下降；
-達不到就如實寫進限制並分析原因。
+完整表與逐局記錄：[results/baselines.md](results/baselines.md)、
+最終報告：`runs/wordle-grpo-v3/results/final_report.md`（Drive）。
+
+**紅線判讀（如實陳述）**：三項成功判準中——(1) **格式錯誤率塌陷 ✅**：未訓練 base 在此
+協定下 100% 回合非法（一手合法棋都下不出來），訓練後 0.3%，tag 遵循率 0%→99.7%，
+壓倒性顯著；(2) **訓練曲線上升 ✅**：reward/mean -9.4→-3.2（3000 步），非法回合/局
+4.2→~0.1；(3) **勝率顯著超過 baseline ⚠️ 未達成**：0/200→4/200 方向正確，但 Fisher
+單尾 p≈0.06、Wilson CI 重疊，n=200 下不足以宣稱顯著——依紅線不做此宣稱，原因分析
+（獎勵結構/模型容量/訓練量）見 [docs/model_card.md](docs/model_card.md) 限制章節。
 
 ## 重現步驟
 
@@ -93,8 +99,9 @@ python play.py --answer crane --adapter runs/full/final
 - [PLAN.md](PLAN.md)——完整 v1 計畫（含研究查證、設計決策表、里程碑 gate）
 - [docs/decision.md](docs/decision.md)——訓練器選型（verifiers / ART / TRL）與來源
 - [docs/rewards.md](docs/rewards.md)——獎勵量級論證與防 reward hacking 分析
-- [docs/model_card.md](docs/model_card.md)——HF model card（訓練後回填數據）
-- 產出模型：`steven0226/qwen2.5-1.5b-wordle-grpo`（LoRA）/ `…-merged` ⬜ 待訓練後 push
+- [docs/model_card.md](docs/model_card.md)——HF model card（已回填真實評測數據）
+- 產出模型（已上線）：[steven0226/qwen2.5-1.5b-wordle-grpo](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo)（LoRA）
+  / [steven0226/qwen2.5-1.5b-wordle-grpo-merged](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo-merged)（合併全量權重）
 
 <!-- GitHub 發佈（暫緩，之後一鍵補上）：
 gh repo create agentic-rl-wordle --public --source=. --push

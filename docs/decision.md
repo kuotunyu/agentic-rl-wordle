@@ -147,6 +147,42 @@ importance_sampling_ratio 從 1e-24→0.5~0.7、reward 兩步內 1.3→4.2」這
 上出現類似「reward 漲但 win_rate 差一點門檻」的情況，比照本次判斷邏輯（reward 條件 +
 transcript 人工檢視）處理，不機械式卡在單一寫死的百分點數字上。
 
+## M3.2–M3.4 驗證記錄（真正 Wordle 環境；2026-07-11 實測）
+
+**M3.2 pilot（1 小時，400 步）**：管線一次跑通（0 崩潰），reward -10.5→-7.7、
+非法回合/局 4.5→3。人工檢視 samples/ 抓到一個真 bug：協定的格式範例用了字面
+`<guess>word</guess>`（"word" 恰為 4 字母）且每回合重複出現，模型模仿了**範例的字母數**
+而非規則——transcript 裡 no_parse 猜測異常集中在 4 字母詞（girl/zone/leak/pool/…）。
+改成真實 5 字母範例（crane）+ 回歸測試（commit `5cfecdf`）。
+
+**M3.3 第一次嘗試（A100 40GB）——OOM 6 連炸，根因修正**：每次都死在 loss.backward()
+要求 7.2~7.36 GiB；反推 = micro-batch 8 × 序列 ~1600 × 詞彙表 151,936 × 4 bytes 的
+fp32 logits 級張量（誤差 ±2%）。碎片化/洩漏/vLLM 增長等對立假說逐一對照 log 排除
+（3 路 agent 工作流驗證：TRL 1.8 原始碼實讀 + repo 假設掃描 + 對抗性診斷覆核）。
+修正（commit `96f63d9`）：micro-batch 8→4、grad_accum 2→4（生成批不變＝訓練數學等價，
+TRL 的組 advantage 在生成時算完才切 micro-batch）；順帶實測校正 max_steps 400→3000
+（實際 ~5 秒/步，原估 60–120 秒嚴重高估）、checkpoint 30→10 分鐘。硬體側改用
+A100 80GB（Colab「大量 RAM」開關實為 40/80GB 顯卡切換——使用者查證糾正了作者）。
+
+**M3.3 第二次嘗試（v2）——訓練完美、權重遺失**：3000 步 0 崩潰跑完，但 Colab 的
+Drive 掛載在訓練中途（~5:27pm）無聲降級：**新建檔案全部沒有落地**（checkpoint 目錄
+空殼、samples 停在 step 2450、final/ 消失），既有檔案的 append 卻照常成功，訓練行程
+對此零感知。教訓與對策（commit `168da7c`）：訓練寫本機碟、每 15 分鐘低頻鏡像 Drive、
+結束後先複製權重到 Drive 並逐檔驗證大小、flush_and_unmount 後才釋放機器。
+
+**M3.3 第三次嘗試（v3）——成功**：3000 步 0 崩潰，權重保全驗證通過。評測入口隨即
+踩到 libcudart.so.13（M2.1 已知問題，但當時只修在 train.py；eval 從未真正在 Colab
+執行過所以缺口一直隱形）——把 ctypes 預載修正搬到共用模組 cuda_compat.py，
+train/eval/play 全數收口（commit `814e7a0`），救援 notebook 於 L4 上完成評測與 push。
+
+**M3.4 最終評測（200 held-out 詞、greedy、前後同 seed 對照）**：
+base 0.0% 勝率 [0.0,1.9]、100% 非法、0% tag 遵循 → **+GRPO LoRA 2.0% [0.8,5.0]、
+0.3% 非法、99.7% tag 遵循、勝局均猜 5.25、重複猜測 0%**。紅線判讀：格式/合法性
+塌陷式改善（壓倒性顯著）+ 訓練曲線確定上升＝成立；勝率 0/200→4/200 方向正確但
+Fisher 單尾 p≈0.06 未達顯著，**不宣稱勝率顯著**。策略弱點（固定開局腳本、
+破壞綠位 46.2%、重用排除字母 57.5%）與原因分析如實寫入 model card 限制章節。
+產出：HF `steven0226/qwen2.5-1.5b-wordle-grpo`（LoRA）與 `…-merged`（全量）。
+
 ## 研究來源
 - TRL releases / GRPOTrainer docs / openenv docs（rollout_func 契約、colocate、Wordle 範例）：
   github.com/huggingface/trl、huggingface.co/docs/trl/main/en/openenv、/grpo_trainer
