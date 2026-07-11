@@ -104,6 +104,11 @@ class VLLMBackend:
         gpu_memory_utilization: float = 0.85,
         max_model_len: int = 2048,
     ):
+        # Colab 的 libcudart.so.13 預載修正——v3 事故實錄：修正原本只在 train.py，
+        # eval 走本 backend import vllm 時直接 ImportError（見 cuda_compat.py）
+        from .cuda_compat import fix_missing_cuda13_runtime_ld_path
+
+        fix_missing_cuda13_runtime_ld_path()
         from vllm import LLM
 
         self.adapter = adapter
