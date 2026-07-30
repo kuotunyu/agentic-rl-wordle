@@ -39,9 +39,18 @@ def main() -> int:
             for f in sorted(p.rglob("*")):
                 if f.is_file() and not (set(f.parts) & EXCLUDE_PARTS) and f.suffix != ".pyc":
                     files.append(f)
-    with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED) as z:
+    # Fixed metadata makes the archive byte-for-byte reproducible across
+    # machines. The full-463 notebook verifies this SHA256 so an older source
+    # bundle cannot be uploaded by accident.
+    with zipfile.ZipFile(OUT, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
         for f in files:
-            z.write(f, f.relative_to(REPO).as_posix())
+            info = zipfile.ZipInfo(
+                f.relative_to(REPO).as_posix(),
+                date_time=(1980, 1, 1, 0, 0, 0),
+            )
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            z.writestr(info, f.read_bytes())
     print(f"OK: {OUT.name}（{len(files)} 檔，{OUT.stat().st_size / 1024:.0f} KB）")
     print("→ 上傳到 Google Drive：MyDrive/agentic-rl-wordle/wordle_rl_bundle.zip")
     return 0
