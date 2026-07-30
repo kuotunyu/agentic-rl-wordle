@@ -183,6 +183,16 @@ Fisher 單尾 p≈0.06 未達顯著，**不宣稱勝率顯著**。策略弱點�
 破壞綠位 46.2%、重用排除字母 57.5%）與原因分析如實寫入 model card 限制章節。
 產出：HF `steven0226/qwen2.5-1.5b-wordle-grpo`（LoRA）與 `…-merged`（全量）。
 
+**M3.5 完整評測（463 held-out 詞、同 seed / greedy / protocol）**：
+200 詞 interim 結果不改寫，另把原先切分中完整的 `eval_full` 全數跑完。base 0/463；
+GRPO LoRA 13/463（2.8% [1.6,4.7]）、tag 99.9%、合法動作 99.8%、勝局均猜 4.08。
+因 base 無任何勝局，13 個 tuned wins 全是成對 discordance；兩側 exact McNemar
+`p=0.000244`。即使把 n=200 與 n=463 視為兩次 nested looks 並用 Bonferroni，
+`p=0.000488` 仍通過 0.05 紅線。結論更新為：**勝率改善統計顯著，但 2.8% 的絕對成功率
+仍不具實用性**；約半數有資訊回合仍破壞綠位或重用排除字母，protocol learning 明顯強於
+strategy learning。完整 artifact：`results/full_463_report.*` 與
+`results/full_463_analysis.*`。
+
 ## 研究來源
 - TRL releases / GRPOTrainer docs / openenv docs（rollout_func 契約、colocate、Wordle 範例）：
   github.com/huggingface/trl、huggingface.co/docs/trl/main/en/openenv、/grpo_trainer
