@@ -1,11 +1,14 @@
-"""階段 3 評測：訓練前後模型在同一批 200 個 eval 詞（固定 seed、greedy）對照。
+"""階段 3 評測：訓練前後模型在同一批 held-out 詞（固定 seed、greedy）對照。
 
     python eval/run_eval.py --adapter runs/full/final --backend vllm          # Colab
+    python eval/run_eval.py --adapter <HF_REPO> --backend vllm \
+        --split eval_full --n 463 --out results/full_463_report.md
     python eval/run_eval.py --adapter runs/full/final --backend transformers  # 本機 GPU
 
 - base 與 base+LoRA 用完全相同的協定/詞序/greedy 設定各跑一遍。
-- 與 results/baselines.json 的 random / heuristic / base 列合併成
+- 預設 200 詞評測會與 results/baselines.json 的 random / heuristic / base 列合併成
   results/final_report.md 對照表（勝率附 Wilson 95% CI）。
+- ``--split eval_full --n 463`` 評估完整 held-out 集；不混入只有 200 詞的舊 baseline。
 - 從訓練後模型的對局中確定性挑 5 局代表 transcript（含至少一局失敗）
   → results/transcripts/ 並內嵌到報告。
 """
@@ -48,13 +51,31 @@ def make_backend(args, adapter: str | None):
     return TransformersBackend(args.model, adapter=adapter)
 
 
-def run_llm(args, adapter: str | None, words, legal) -> list[EpisodeStats]:
-    backend = make_backend(args, adapter)
+def run_llm_with_backend(args, backend, words, legal) -> list[EpisodeStats]:
     cfg = GenConfig(max_new_tokens=args.max_new_tokens, do_sample=False, stop=("</guess>",))
     agent = LLMAgent(backend, cfg, include_summary=not args.no_summary)
-    episodes = run_episodes(agent, words, legal)
-    del backend  # vLLM 需釋放顯存供下一輪載入
-    return episodes
+    return run_episodes(agent, words, legal)
+
+
+def run_llm(args, adapter: str | None, words, legal) -> list[EpisodeStats]:
+    backend = make_backend(args, adapter)
+    try:
+        return run_llm_with_backend(args, backend, words, legal)
+    finally:
+        del backend
+
+
+def select_eval_words(splits, split: str, n: int) -> list[str]:
+    """Select exactly ``n`` words from the requested deterministic split."""
+    pool = getattr(splits, split)
+    if n <= 0:
+        raise ValueError("--n must be positive")
+    if n > len(pool):
+        raise ValueError(
+            f"--n={n} exceeds {split} size ({len(pool)}); "
+            f"use --split eval_full for all {len(splits.eval_full)} held-out words"
+        )
+    return list(pool[:n])
 
 
 def pick_transcripts(episodes: list[EpisodeStats], k: int = 5) -> list[EpisodeStats]:
@@ -94,11 +115,22 @@ def main() -> int:
     ap.add_argument("--adapter", default=None, help="LoRA adapter 路徑（訓練後模型）")
     ap.add_argument("--backend", default="transformers", choices=["transformers", "vllm"])
     ap.add_argument("--n", type=int, default=200)
+    ap.add_argument(
+        "--split",
+        default="eval_200",
+        choices=["eval_200", "eval_full"],
+        help="eval_200（預設可對照既有 baseline）或完整 463 詞 eval_full",
+    )
     ap.add_argument("--seed", type=int, default=42, help="切分 seed（勿改，紅線）")
     ap.add_argument("--max-new-tokens", type=int, default=160)
     ap.add_argument("--no-summary", action="store_true")
     ap.add_argument("--skip-base", action="store_true",
                     help="沿用 results/baselines.json 既有的 base 模型列（相同協定時省一輪推理）")
+    ap.add_argument(
+        "--label-base",
+        default=None,
+        help="報告中的 base 名稱；model 是 HF snapshot 本機路徑時建議明確指定",
+    )
     ap.add_argument("--label-tuned", default="qwen2.5-1.5b **+GRPO LoRA**")
     ap.add_argument("--out", type=Path, default=REPO_ROOT / "results" / "final_report.md")
     ap.add_argument("--baselines", type=Path, default=REPO_ROOT / "results" / "baselines.json")
@@ -106,15 +138,21 @@ def main() -> int:
     args = ap.parse_args()
 
     splits = get_splits(seed=args.seed)
-    words = list(splits.eval_200[: args.n])
+    try:
+        words = select_eval_words(splits, args.split, args.n)
+    except ValueError as exc:
+        ap.error(str(exc))
     legal = load_legal()
+    can_reuse_baselines = args.split == "eval_200" and len(words) == 200
+    if args.skip_base and not can_reuse_baselines:
+        ap.error("--skip-base is only valid for the existing eval_200, n=200 baseline")
 
     rows: list[tuple[str, dict]] = []   # (label, metrics_row) 依表序
     payloads: dict[str, dict] = {}
 
     # ---- baseline 列（random / heuristic）----
-    base_label = args.model.split("/")[-1].lower() + "-base"
-    if args.baselines.exists():
+    base_label = args.label_base or args.model.split("/")[-1].lower() + "-base"
+    if can_reuse_baselines and args.baselines.exists():
         store = json.loads(args.baselines.read_text(encoding="utf-8"))
         for name in ("random", "heuristic"):
             if name in store.get("agents", {}):
@@ -126,13 +164,24 @@ def main() -> int:
     if args.skip_base and args.baselines.exists():
         store = json.loads(args.baselines.read_text(encoding="utf-8"))
         base_row_from_store = store.get("agents", {}).get(base_label)
+    shared_vllm_backend = None
     if base_row_from_store is not None:
         print(f"[eval] base 沿用 baselines.json 的 {base_label} 列", flush=True)
         rows.append((base_label, base_row_from_store["metrics_row"]))
         payloads[base_label] = base_row_from_store["metrics"]
     else:
         print(f"[eval] 跑 base 模型（{args.backend}, greedy, n={len(words)}）…", flush=True)
-        base_eps = run_llm(args, adapter=None, words=words, legal=legal)
+        if args.backend == "vllm" and args.adapter:
+            # Load one engine with LoRA support, then evaluate base and adapter
+            # through the same weights. This avoids re-initializing CUDA/vLLM
+            # and cuts full-463 setup time roughly in half.
+            shared_vllm_backend = make_backend(args, adapter=args.adapter)
+            shared_vllm_backend.adapter = None
+            base_eps = run_llm_with_backend(
+                args, shared_vllm_backend, words=words, legal=legal
+            )
+        else:
+            base_eps = run_llm(args, adapter=None, words=words, legal=legal)
         m = aggregate(base_eps)
         rows.append((base_label, m.as_row()))
         payloads[base_label] = metrics_payload(m)
@@ -142,7 +191,16 @@ def main() -> int:
     tuned_eps: list[EpisodeStats] | None = None
     if args.adapter:
         print(f"[eval] 跑訓練後模型（adapter={args.adapter}）…", flush=True)
-        tuned_eps = run_llm(args, adapter=args.adapter, words=words, legal=legal)
+        if shared_vllm_backend is not None:
+            shared_vllm_backend.adapter = args.adapter
+            tuned_eps = run_llm_with_backend(
+                args, shared_vllm_backend, words=words, legal=legal
+            )
+            del shared_vllm_backend
+        else:
+            tuned_eps = run_llm(
+                args, adapter=args.adapter, words=words, legal=legal
+            )
         m = aggregate(tuned_eps)
         rows.append((args.label_tuned, m.as_row()))
         payloads[args.label_tuned] = metrics_payload(m)
@@ -165,7 +223,7 @@ def main() -> int:
     lines = [
         "# 最終評測報告（真實執行結果）",
         "",
-        f"- 評測集：固定 eval_200（seed={args.seed}，n={len(words)}），train/eval 嚴格隔離",
+        f"- 評測集：固定 {args.split}（seed={args.seed}，n={len(words)}），train/eval 嚴格隔離",
         f"- 解碼：greedy（do_sample=False），max_new_tokens={args.max_new_tokens}，"
         f"線索摘要={'關' if args.no_summary else '開'}",
         f"- 產生時間：{datetime.now(timezone.utc).isoformat(timespec='seconds')}",
@@ -185,9 +243,16 @@ def main() -> int:
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text("\n".join(lines), encoding="utf-8")
 
-    (args.out.parent / "final_report.json").write_text(
+    args.out.with_suffix(".json").write_text(
         json.dumps(
-            {"meta": {"n": len(words), "seed": args.seed}, "rows": payloads},
+            {
+                "meta": {
+                    "n": len(words),
+                    "seed": args.seed,
+                    "split": args.split,
+                },
+                "rows": payloads,
+            },
             ensure_ascii=False,
             indent=1,
         ),

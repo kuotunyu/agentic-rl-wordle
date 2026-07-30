@@ -1,0 +1,43 @@
+{
+  "meta": {
+    "n": 463,
+    "seed": 42,
+    "split": "eval_full",
+    "generated_at": "2026-07-26T16:00:32+00:00",
+    "note": "Base label normalized from the local HF snapshot hash to the public model name; metrics are unchanged."
+  },
+  "rows": {
+    "qwen2.5-1.5b-instruct-base": {
+      "n": 463,
+      "wins": 0,
+      "win_rate": 0.0,
+      "win_ci": [
+        0.0,
+        0.008228915332309716
+      ],
+      "avg_guesses_on_wins": null,
+      "illegal_rate": 1.0,
+      "env_illegal_rate": 1.0,
+      "tag_ok_rate": 0.0,
+      "absent_reuse_rate": null,
+      "green_break_rate": null,
+      "repeat_rate": 0.0
+    },
+    "qwen2.5-1.5b **+GRPO LoRA**": {
+      "n": 463,
+      "wins": 13,
+      "win_rate": 0.028077753779697623,
+      "win_ci": [
+        0.016480756047106845,
+        0.04744156792744897
+      ],
+      "avg_guesses_on_wins": 4.076923076923077,
+      "illegal_rate": 0.0018162005085361425,
+      "env_illegal_rate": 0.0018162005085361425,
+      "tag_ok_rate": 0.998547039593171,
+      "absent_reuse_rate": 0.5851528384279476,
+      "green_break_rate": 0.488646288209607,
+      "repeat_rate": 0.0003632401017072285
+    }
+  }
+}

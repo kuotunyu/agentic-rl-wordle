@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "split": "eval_full",
+  "seed": 42,
+  "n_pairs": 463,
+  "base": "qwen2.5-1.5b-instruct-base",
+  "tuned": "qwen2.5-1.5b **+GRPO LoRA**",
+  "base_wins": 0,
+  "tuned_wins": 13,
+  "absolute_win_rate_gain": 0.028077753779697623,
+  "gain_wilson_ci_95": [
+    0.016480756047106845,
+    0.04744156792744897
+  ],
+  "paired_discordance": {
+    "base_only_correct": 0,
+    "tuned_only_correct": 13
+  },
+  "mcnemar_two_sided_exact_p": 0.000244140625,
+  "sequential_looks": 2,
+  "bonferroni_corrected_p": 0.00048828125,
+  "base_legal_action_rate": 0.0,
+  "tuned_legal_action_rate": 0.9981837994914639,
+  "base_tag_adherence_rate": 0.0,
+  "tuned_tag_adherence_rate": 0.998547039593171,
+  "tuned_absent_letter_preservation_rate": 0.41484716157205237,
+  "tuned_green_preservation_rate": 0.511353711790393,
+  "tuned_repeat_rate": 0.0003632401017072285,
+  "interpretation": "statistically_significant_but_small_practical_task_success"
+}
