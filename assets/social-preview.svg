@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#171613"/>
+      <stop offset=".55" stop-color="#101717"/>
+      <stop offset="1" stop-color="#081b19"/>
+    </linearGradient>
+    <pattern id="dots" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#d9e0cf" opacity=".1"/>
+    </pattern>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#dots)"/>
+  <rect x="0" y="0" width="1280" height="12" fill="#ddff52"/>
+  <text x="68" y="77" font-family="Consolas, monospace" font-size="20" font-weight="700" letter-spacing="4" fill="#ddff52">RL / 03 — MULTI-TURN AGENTS</text>
+  <text x="66" y="178" font-family="Georgia, serif" font-size="61" font-weight="700" fill="#f3f0e7">PROTOCOL FIRST.</text>
+  <text x="66" y="247" font-family="Georgia, serif" font-size="61" font-weight="700" fill="#f3f0e7">STRATEGY LATER.</text>
+  <text x="70" y="291" font-family="Consolas, monospace" font-size="17" letter-spacing="1.3" fill="#a8b5aa">LEARNING THE PROTOCOL BEFORE THE STRATEGY</text>
+  <g transform="translate(70 345)">
+    <rect width="246" height="132" rx="3" fill="#202321" stroke="#7f9183"/>
+    <text x="20" y="38" font-family="Consolas, monospace" font-size="15" letter-spacing="1" fill="#a8b5aa">PROTOCOL</text>
+    <text x="20" y="92" font-family="Georgia, serif" font-size="50" font-weight="700" fill="#ddff52">99.9%</text>
+    <text x="20" y="116" font-family="Consolas, monospace" font-size="14" fill="#a8b5aa">0.0% BASE</text>
+  </g>
+  <g transform="translate(336 345)">
+    <rect width="246" height="132" rx="3" fill="#202321" stroke="#7f9183"/>
+    <text x="20" y="38" font-family="Consolas, monospace" font-size="15" letter-spacing="1" fill="#a8b5aa">HELD-OUT WINS</text>
+    <text x="20" y="92" font-family="Georgia, serif" font-size="50" font-weight="700" fill="#f3f0e7">13/463</text>
+    <text x="20" y="116" font-family="Consolas, monospace" font-size="14" fill="#a8b5aa">p = 0.000244</text>
+  </g>
+  <text x="70" y="535" font-family="Consolas, monospace" font-size="17" fill="#a8b5aa">STATISTICALLY REAL</text>
+  <text x="274" y="535" font-family="Consolas, monospace" font-size="17" fill="#f15f79">/ PRACTICALLY SMALL</text>
+  <g transform="translate(736 125)">
+    <g font-family="Consolas, monospace" font-size="35" font-weight="700" text-anchor="middle">
+      <g transform="translate(0 0)">
+        <rect x="0" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="38" y="51" fill="#fff">C</text>
+        <rect x="88" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="126" y="51" fill="#fff">L</text>
+        <rect x="176" y="0" width="76" height="76" rx="5" fill="#c7a341"/><text x="214" y="51" fill="#fff">O</text>
+        <rect x="264" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="302" y="51" fill="#fff">U</text>
+        <rect x="352" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="390" y="51" fill="#fff">D</text>
+      </g>
+      <g transform="translate(0 92)">
+        <rect x="0" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="38" y="51" fill="#fff">T</text>
+        <rect x="88" y="0" width="76" height="76" rx="5" fill="#c7a341"/><text x="126" y="51" fill="#fff">R</text>
+        <rect x="176" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="214" y="51" fill="#fff">A</text>
+        <rect x="264" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="302" y="51" fill="#fff">I</text>
+        <rect x="352" y="0" width="76" height="76" rx="5" fill="#c7a341"/><text x="390" y="51" fill="#fff">N</text>
+      </g>
+      <g transform="translate(0 184)">
+        <rect x="0" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="38" y="51" fill="#fff">C</text>
+        <rect x="88" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="126" y="51" fill="#fff">R</text>
+        <rect x="176" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="214" y="51" fill="#fff">A</text>
+        <rect x="264" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="302" y="51" fill="#fff">T</text>
+        <rect x="352" y="0" width="76" height="76" rx="5" fill="#333a36"/><text x="390" y="51" fill="#fff">E</text>
+      </g>
+      <g transform="translate(0 276)">
+        <rect x="0" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="38" y="51" fill="#fff">C</text>
+        <rect x="88" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="126" y="51" fill="#fff">R</text>
+        <rect x="176" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="214" y="51" fill="#fff">A</text>
+        <rect x="264" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="302" y="51" fill="#fff">C</text>
+        <rect x="352" y="0" width="76" height="76" rx="5" fill="#4d9362"/><text x="390" y="51" fill="#fff">K</text>
+      </g>
+    </g>
+  </g>
+</svg>
