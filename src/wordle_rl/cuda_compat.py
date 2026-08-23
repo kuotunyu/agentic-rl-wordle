@@ -41,9 +41,7 @@ def fix_missing_cuda13_runtime_ld_path() -> None:
     }
     if not dirs:
         return
-    os.environ["LD_LIBRARY_PATH"] = (
-        ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
-    )
+    os.environ["LD_LIBRARY_PATH"] = ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
     import ctypes
 
     for d in dirs:

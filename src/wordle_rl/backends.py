@@ -14,10 +14,10 @@ from typing import Protocol
 @dataclass(frozen=True)
 class GenConfig:
     max_new_tokens: int = 160
-    do_sample: bool = False          # False = greedy（評測/baseline）
-    temperature: float = 1.0         # 只在 do_sample=True 時生效
+    do_sample: bool = False  # False = greedy（評測/baseline）
+    temperature: float = 1.0  # 只在 do_sample=True 時生效
     top_p: float = 1.0
-    stop: tuple[str, ...] = ()       # 例如 ("</guess>",)；命中時停止並保留 stop 字串
+    stop: tuple[str, ...] = ()  # 例如 ("</guess>",)；命中時停止並保留 stop 字串
 
 
 class GenerationBackend(Protocol):
@@ -75,9 +75,7 @@ class TransformersBackend:
                 # 壓掉 Qwen generation_config 的採樣預設
                 kwargs.update(do_sample=False, temperature=None, top_p=None, top_k=None)
             with torch.inference_mode():
-                out = self.model.generate(
-                    **enc, **kwargs, pad_token_id=self.tokenizer.pad_token_id
-                )
+                out = self.model.generate(**enc, **kwargs, pad_token_id=self.tokenizer.pad_token_id)
             new_tokens = out[:, enc["input_ids"].shape[1] :]
             texts = self.tokenizer.batch_decode(new_tokens, skip_special_tokens=True)
             outs.extend(self._apply_stop(t, cfg.stop) for t in texts)
@@ -135,7 +133,5 @@ class VLLMBackend:
             from vllm.lora.request import LoRARequest
 
             lora_request = LoRARequest("adapter", 1, self.adapter)
-        outputs = self.llm.chat(
-            chats, params, lora_request=lora_request, use_tqdm=False
-        )
+        outputs = self.llm.chat(chats, params, lora_request=lora_request, use_tqdm=False)
         return [o.outputs[0].text for o in outputs]

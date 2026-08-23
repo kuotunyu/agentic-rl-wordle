@@ -33,13 +33,13 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
-from .episode import EpisodeStats
-from .rewards import RewardConfig, episode_reward
 from .env.number_guess import number_guess_reward
+from .episode import EpisodeStats
 from .games import TurnBasedGame
-
+from .rewards import RewardConfig, episode_reward
 
 # ---------------------------------------------------------------- 核心引擎
+
 
 @dataclass(frozen=True)
 class TurnGen:
@@ -59,12 +59,14 @@ class TurnSegment:
 
     gen: TurnGen
     messages_before: tuple[dict, ...]  # 這回合生成前的完整對話
-    messages_after: tuple[dict, ...]   # game.step() 之後（含這回合 canonical assistant + 若有的回饋）
+    messages_after: tuple[
+        dict, ...
+    ]  # game.step() 之後（含這回合 canonical assistant + 若有的回饋）
 
 
 @dataclass
 class EpisodeRollout:
-    completion_ids: list[int]   # 原始版：純模型生成 token 串接（debug/transcript 用，不變）
+    completion_ids: list[int]  # 原始版：純模型生成 token 串接（debug/transcript 用，不變）
     logprobs: list[float]
     stats: dict
     transcript: str
@@ -191,6 +193,7 @@ def build_masked_completion(
 
 # ---------------------------------------------------------------- 監控緩衝
 
+
 class RolloutBuffers:
     """rollout_func / reward_fn 與 TrainerCallback 之間的共享緩衝（同進程）。"""
 
@@ -208,19 +211,18 @@ class RolloutBuffers:
             if n:
                 self.last_batch_stats = {
                     "rollout/win_rate": sum(r.stats.get("win", 0.0) for r in rollouts) / n,
-                    "rollout/illegal_per_ep": sum(r.stats.get("num_illegal", 0) for r in rollouts) / n,
-                    "rollout/repeat_per_ep": sum(r.stats.get("num_repeats", 0) for r in rollouts) / n,
+                    "rollout/illegal_per_ep": sum(r.stats.get("num_illegal", 0) for r in rollouts)
+                    / n,
+                    "rollout/repeat_per_ep": sum(r.stats.get("num_repeats", 0) for r in rollouts)
+                    / n,
                     "rollout/mean_turns": sum(r.stats.get("turns_used", 0) for r in rollouts) / n,
-                    "rollout/budget_truncated_frac": sum(1 for r in rollouts if r.budget_truncated) / n,
+                    "rollout/budget_truncated_frac": sum(1 for r in rollouts if r.budget_truncated)
+                    / n,
                 }
 
     def record_rewards(self, rewards: list[float], num_generations: int) -> None:
-        groups = [
-            rewards[i : i + num_generations] for i in range(0, len(rewards), num_generations)
-        ]
-        zero_var = sum(
-            1 for grp in groups if len(grp) > 1 and statistics.pstdev(grp) < 1e-9
-        )
+        groups = [rewards[i : i + num_generations] for i in range(0, len(rewards), num_generations)]
+        zero_var = sum(1 for grp in groups if len(grp) > 1 and statistics.pstdev(grp) < 1e-9)
         with self._lock:
             self.last_reward_stats = {
                 "reward/mean": sum(rewards) / len(rewards) if rewards else 0.0,
@@ -239,6 +241,7 @@ class RolloutBuffers:
 
 # ---------------------------------------------------------------- 答案取樣
 
+
 def make_answer_sampler(answers: list, seed: int) -> Callable[[], Any]:
     """seeded 無限循環取樣：每輪 epoch 重洗。同一 prompt 槽位的一組 rollout 共用一次取樣。"""
     rng = random.Random(seed)
@@ -256,12 +259,14 @@ def make_answer_sampler(answers: list, seed: int) -> Callable[[], Any]:
 
 # ---------------------------------------------------------------- TRL 轉接面
 
+
 class SpikeValidationError(RuntimeError):
     """TRL 實驗性 API 與預期不符——這是 M2.1 spike 要當場解決的點。"""
 
 
-def _trl_generate_fn(trainer, per_turn_max_tokens: int, temperature: float, top_p: float,
-                     stop: tuple[str, ...]) -> GenerateFn:
+def _trl_generate_fn(
+    trainer, per_turn_max_tokens: int, temperature: float, top_p: float, stop: tuple[str, ...]
+) -> GenerateFn:
     """把 GRPOTrainer 的 vLLM（colocate/server 皆可）包成 GenerateFn。
 
     【M2.1 spike 驗證點 A2】generate_rollout_completions 的簽名與取樣覆寫：
@@ -282,8 +287,7 @@ def _trl_generate_fn(trainer, per_turn_max_tokens: int, temperature: float, top_
 
     def render(chats: list[list[dict]]) -> list[str]:
         return [
-            tok.apply_chat_template(c, tokenize=False, add_generation_prompt=True)
-            for c in chats
+            tok.apply_chat_template(c, tokenize=False, add_generation_prompt=True) for c in chats
         ]
 
     _MISSING = object()
@@ -316,8 +320,12 @@ def _trl_generate_fn(trainer, per_turn_max_tokens: int, temperature: float, top_
     def generate(chats: list[list[dict]]) -> list[TurnGen]:
         prompts_text = render(chats)
         attempts = (
-            dict(max_tokens=per_turn_max_tokens, stop=list(stop),
-                 temperature=temperature, top_p=top_p),
+            dict(
+                max_tokens=per_turn_max_tokens,
+                stop=list(stop),
+                temperature=temperature,
+                top_p=top_p,
+            ),
             dict(max_tokens=per_turn_max_tokens, stop=list(stop)),
             dict(),
         )
@@ -436,6 +444,7 @@ def _initial_messages(game: TurnBasedGame) -> list[dict]:
 
 
 # ---------------------------------------------------------------- reward 轉接
+
 
 def make_trl_reward_fn(
     game: str,

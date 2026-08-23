@@ -22,13 +22,15 @@ language:
 Wordle solver。
 
 - 訓練框架：TRL 1.8 GRPOTrainer + 自訂多輪 `rollout_func`（單張 A100、vLLM colocate、LoRA）
-- 環境/獎勵/評測程式碼：GitHub `agentic-rl-wordle`（含完整 PLAN 與四階段 gate 記錄）
+- 環境/獎勵/評測程式碼：本機 `agentic-rl-wordle` release candidate；預定發布至
+  `kuotunyu/agentic-rl-wordle`，目前尚未建立 GitHub repo
 - 姊妹 repo：`-merged` 為合併後全量權重；本 repo 為 LoRA adapter
 
 ## 方法
 
 1. **環境**：經典兩趟重複字母規則（先標 G 扣計數，再左→右標 Y）；非法猜測消耗回合。
-   答案 2,315 / 合法猜測 12,972（cfreshman 公開清單，fetch-at-setup）。
+   答案 2,315 / 合法猜測 12,972（revision/hash pinned cfreshman fetch；清單不隨 repo
+   重發且 gist 未提供明確 license）。
 2. **協定**：system prompt 說明規則與 G/Y/X 記號；歷史每輪
    `You guessed "crane" -> feedback: G Y X X Y` + 已知線索摘要；模型輸出經三態
    robust parser（tag → 全文最後 5 字母詞 → 放棄）。
@@ -70,6 +72,10 @@ Wordle solver。
 完整報告與檢定見 repo 的 `results/full_463_report.md` 與
 `results/full_463_analysis.md`。較早的 200 詞 random / heuristic 參照仍保留在
 `results/baselines.md`，但不是最終顯著性結論的樣本。
+
+證據邊界：完整 463-word per-episode raw records 未 committed；上述數字可從 committed
+aggregate JSON 重算，代表性 transcripts 不能視為完整 raw corpus。外部 model card 應同時
+連結 `docs/claim-matrix.md` 與 immutable Git candidate SHA。
 
 ## 代表性對局（訓練後模型，eval 確定性選取，含失敗案例）
 
@@ -123,8 +129,9 @@ Wordle solver。
   是「有進步但無法穩定獲勝」）。本專案的成功判準是：**勝率顯著超過未訓練 baseline
   （信賴區間佐證）+ 格式錯誤率塌陷 + 違限率下降**，不是「打贏 heuristic solver」。
 - heuristic baseline 看得到完整答案分布，是參照上界而非公平對手。
-- **勝率項已在完整評測達顯著，但效果小**：0/463 → 13/463，絕對提升 2.8 個百分點
-  [1.6, 4.7]。統計上可排除「完全沒有 task-success 改善」，但不能推論模型已穩定會玩。
+- **勝率項已在完整評測達顯著，但效果小**：0/463 → 13/463，觀察到的絕對提升為
+  2.8 個百分點；`[1.6, 4.7]` 是 tuned win rate 的 Wilson 95% CI，不是 paired difference
+  的區間。exact paired test 可排除「完全沒有 task-success 改善」，但不能推論模型已穩定會玩。
 - **策略弱點（訓練期與評測一致觀察到）**：模型收斂到固定開局腳本（cloud → train →…），
   且經常不沿用已確認的綠位（破壞綠位率 48.9%）、重用已排除字母（58.5%）——它學會了
   「下合法的棋」，但只部分學會「利用回饋收斂」。可能原因依序：(a) shaped 獎勵中
@@ -138,11 +145,17 @@ Wordle solver。
 在專案根目錄執行：
 
 ```bash
-python scripts/fetch_words.py && pip install -e . && pytest
+python -m venv .venv
+.venv/bin/python -m pip install -c constraints/dev.txt -e ".[dev]"
+.venv/bin/python scripts/fetch_words.py
+.venv/bin/python -m pytest
 python baselines/run_baseline.py --agent random
 # 訓練：上傳 wordle_rl_bundle.zip 到 Drive，跑 wordle_grpo_colab_train.ipynb（SMOKE→FULL）
 python play.py --answer crane --adapter <path>
 ```
+
+Windows 請把 `.venv/bin/` 換成 `.venv/Scripts/`。單字表來源授權不等同於本模型/程式碼的
+Apache-2.0；詳見 repo 的 `docs/data-governance.md`。
 
 完整 463 詞評測使用 `wordle_full463_eval_colab.ipynb`（L4 GPU）；notebook 會驗證 bundle、
 跑 base/LoRA paired eval、產生 exact analysis，並把四個結果檔保存到 Drive。

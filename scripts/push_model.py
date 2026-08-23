@@ -17,8 +17,12 @@ from pathlib import Path
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--adapter", type=Path, required=True, help="LoRA adapter 目錄（trainer save_model 輸出）")
-    ap.add_argument("--repo", required=True, help="HF repo id，例：steven0226/qwen2.5-1.5b-wordle-grpo")
+    ap.add_argument(
+        "--adapter", type=Path, required=True, help="LoRA adapter 目錄（trainer save_model 輸出）"
+    )
+    ap.add_argument(
+        "--repo", required=True, help="HF repo id，例：steven0226/qwen2.5-1.5b-wordle-grpo"
+    )
     ap.add_argument("--base", default="Qwen/Qwen2.5-1.5B-Instruct")
     ap.add_argument("--merged-repo", default=None, help="預設 <repo>-merged")
     ap.add_argument("--card", type=Path, default=None, help="model card markdown 路徑")
@@ -40,7 +44,14 @@ def main() -> int:
     api.upload_folder(
         folder_path=str(args.adapter),
         repo_id=args.repo,
-        ignore_patterns=["checkpoint-*", "*.log", "optimizer*", "scheduler*", "rng_state*", "trainer_state*"],
+        ignore_patterns=[
+            "checkpoint-*",
+            "*.log",
+            "optimizer*",
+            "scheduler*",
+            "rng_state*",
+            "trainer_state*",
+        ],
     )
 
     # ---- merged ----
@@ -55,7 +66,7 @@ def main() -> int:
 
     # ---- model card ----
     if args.card and args.card.exists():
-        for repo in ([args.repo] if args.skip_merged else [args.repo, merged_repo]):
+        for repo in [args.repo] if args.skip_merged else [args.repo, merged_repo]:
             api.upload_file(
                 path_or_fileobj=str(args.card),
                 path_in_repo="README.md",

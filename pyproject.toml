@@ -1,26 +1,70 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools==80.9.0", "wheel==0.45.1"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "wordle-rl"
-version = "0.1.0"
 description = "Agentic RL: multi-turn GRPO training of Qwen2.5-1.5B-Instruct to play Wordle"
 readme = "README.md"
-requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
-authors = [{ name = "steven0226" }]
+dynamic = ["version"]
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [
+  { name = "kuotunyu", email = "61350295+kuotunyu@users.noreply.github.com" },
+]
+maintainers = [
+  { name = "kuotunyu", email = "61350295+kuotunyu@users.noreply.github.com" },
+]
+keywords = ["agentic-rl", "grpo", "multi-turn", "qwen", "wordle"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 # 核心套件（env/protocol/knowledge/rewards/metrics）零依賴：Windows CPU pytest 秒級可跑。
 # torch/transformers/vllm/trl 只在推理與訓練情境需要，見 extras 與 requirements-colab.txt。
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
-play = ["torch", "transformers>=4.45", "peft>=0.14", "colorama>=0.4"]
+dev = [
+  "build>=1.3,<2",
+  "pytest>=8.4,<9",
+  "ruff>=0.12,<1",
+]
+play = [
+  "colorama>=0.4,<1",
+  "peft>=0.14,<1",
+  "torch>=2.4,<3",
+  "transformers>=4.45,<6",
+]
+
+[project.scripts]
+wordle-rl = "wordle_rl.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/kuotunyu/agentic-rl-wordle"
+Repository = "https://github.com/kuotunyu/agentic-rl-wordle"
+"Model - LoRA adapter" = "https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo"
+"Model - merged" = "https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo-merged"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.dynamic]
+version = { attr = "wordle_rl.__version__" }
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

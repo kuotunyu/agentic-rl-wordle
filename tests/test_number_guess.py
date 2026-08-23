@@ -30,7 +30,7 @@ def test_parse_no_parse():
 def test_game_flow_and_feedback_direction():
     g = NumberGuessGame(answer=42)
     assert not g.step("<guess>50</guess>")
-    assert g.turns[-1]["feedback"] == "LOWER"      # 秘密數比 50 小
+    assert g.turns[-1]["feedback"] == "LOWER"  # 秘密數比 50 小
     assert not g.step("<guess>30</guess>")
     assert g.turns[-1]["feedback"] == "HIGHER"
     done = g.step("<guess>42</guess>")
@@ -66,10 +66,18 @@ def test_loss_after_max_turns():
 
 
 def test_reward_values():
-    assert number_guess_reward({"win": 1.0, "turns_used": 1, "num_illegal": 0, "num_repeats": 0}) == pytest.approx(8.0)
-    assert number_guess_reward({"win": 1.0, "turns_used": 7, "num_illegal": 0, "num_repeats": 0}) == pytest.approx(5.0)
-    assert number_guess_reward({"win": 0.0, "turns_used": 7, "num_illegal": 7, "num_repeats": 0}) == pytest.approx(-14.0)
-    assert number_guess_reward({"win": 0.0, "turns_used": 7, "num_illegal": 0, "num_repeats": 2}) == pytest.approx(-4.0)
+    assert number_guess_reward(
+        {"win": 1.0, "turns_used": 1, "num_illegal": 0, "num_repeats": 0}
+    ) == pytest.approx(8.0)
+    assert number_guess_reward(
+        {"win": 1.0, "turns_used": 7, "num_illegal": 0, "num_repeats": 0}
+    ) == pytest.approx(5.0)
+    assert number_guess_reward(
+        {"win": 0.0, "turns_used": 7, "num_illegal": 7, "num_repeats": 0}
+    ) == pytest.approx(-14.0)
+    assert number_guess_reward(
+        {"win": 0.0, "turns_used": 7, "num_illegal": 0, "num_repeats": 2}
+    ) == pytest.approx(-4.0)
 
 
 @pytest.mark.parametrize("answer", [1, 2, 37, 50, 63, 99, 100])

@@ -1,10 +1,12 @@
-# Colab（A100）訓練環境精確 pin。
-# 版本三元組已由 M2.1 spike 實測校正（2026-07 spike run，torch/trl/transformers/peft 皆確認可行）：
+# 歷史 Colab（A100）直接 constraints；不是完整 transitive lock。
+# 2026-07 run 明確記錄的核心版本如下；datasets/accelerate/torchao 只有當時的相容下界，
+# 若要 bit-for-bit 重建訓練環境，仍需取回原始 pip freeze（見 docs/release-readiness.md）。
+# 版本三元組已由 M2.1 spike 實測校正：
 #   torch==2.11.0+cu128（Colab 內建 CUDA build，不覆蓋）| trl==1.8.0 |
 #   transformers==5.12.1 | peft==0.19.1
 trl==1.8.0
 peft==0.19.1
-transformers>=4.51
+transformers==5.12.1
 datasets>=3.0
 accelerate>=1.0
 # vllm：TRL 1.8.0 官方僅支援 0.16.0–0.23.0（spike 第一輪不 pin 時抓到最新 0.24.0，

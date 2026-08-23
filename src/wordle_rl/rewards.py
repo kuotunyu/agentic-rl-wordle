@@ -23,12 +23,13 @@ from .episode import EpisodeStats
 class RewardConfig:
     max_turns: int = 6
     win_base: float = 10.0
-    win_turn_bonus: float = 1.0      # ×(max_turns − turns_used)
+    win_turn_bonus: float = 1.0  # ×(max_turns − turns_used)
     new_green: float = 0.2
     new_presence: float = 0.1
-    illegal_penalty: float = -2.0    # 每個非法/格式錯回合
+    illegal_penalty: float = -2.0  # 每個非法/格式錯回合
     violation_penalty: float = -1.0  # 每個含違規的回合
-    repeat_penalty: float = -2.0     # 每次重複同字
+    repeat_penalty: float = -2.0  # 每次重複同字
+
 
 DEFAULT_CONFIG = RewardConfig()
 

@@ -110,8 +110,10 @@ def main(argv: list[str] | None = None) -> int:
     )
     output_dir = args.output_dir or Path("runs") / preset.name
     output_dir.mkdir(parents=True, exist_ok=True)
-    print(f"[train] preset={preset.name} game={preset.game} reward={args.reward} "
-          f"out={output_dir}", flush=True)
+    print(
+        f"[train] preset={preset.name} game={preset.game} reward={args.reward} out={output_dir}",
+        flush=True,
+    )
 
     # ---- 重依賴從這裡開始 ----
     from datasets import Dataset
@@ -164,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         max_steps=preset.max_steps,
         logging_steps=1,
         save_strategy="steps",
-        save_steps=1_000_000,          # 存檔由 TimedCheckpointCallback 的時間制驅動
+        save_steps=1_000_000,  # 存檔由 TimedCheckpointCallback 的時間制驅動
         save_total_limit=preset.save_total_limit,
         bf16=True,
         gradient_checkpointing=True,
@@ -184,7 +186,15 @@ def main(argv: list[str] | None = None) -> int:
         r=preset.lora_r,
         lora_alpha=preset.lora_alpha,
         lora_dropout=preset.lora_dropout,
-        target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
+        target_modules=[
+            "q_proj",
+            "k_proj",
+            "v_proj",
+            "o_proj",
+            "gate_proj",
+            "up_proj",
+            "down_proj",
+        ],
         task_type="CAUSAL_LM",
     )
 

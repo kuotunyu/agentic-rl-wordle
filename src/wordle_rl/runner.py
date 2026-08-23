@@ -32,9 +32,7 @@ def play_turn(state: EpisodeState, raw_text: str) -> TurnRecord:
     """
     parsed = parse_guess(raw_text)
     had_info = state.knowledge.has_info()
-    violations = (
-        tuple(sorted(state.knowledge.violations(parsed.guess))) if parsed.guess else ()
-    )
+    violations = tuple(sorted(state.knowledge.violations(parsed.guess))) if parsed.guess else ()
 
     feedback, done, info = state.env.step(parsed.guess)
     guess_norm = info["guess"]

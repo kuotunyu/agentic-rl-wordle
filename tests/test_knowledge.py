@@ -22,7 +22,7 @@ def test_duplicate_x_is_exact_count_not_absent():
     """經典陷阱：dolly 猜 lolly → 開頭 l 拿 X，但 l 明明存在（恰 2 個）。"""
     k = Knowledge()
     fed(k, "lolly", "dolly")  # XGGGG
-    assert k.exact_counts["l"] == 2      # X 出現 ⇒ 數量探底 = g+y = 2
+    assert k.exact_counts["l"] == 2  # X 出現 ⇒ 數量探底 = g+y = 2
     assert k.min_counts["l"] == 2
     # 下一手用 l 絕不可判「重用不存在字母」
     assert "reuses_absent_letter" not in k.violations("llama")
@@ -31,7 +31,7 @@ def test_duplicate_x_is_exact_count_not_absent():
 def test_violation_reuses_absent_letter():
     k = Knowledge()
     fed(k, "speed", "dolly")  # s/p/e exact 0
-    assert k.violations("spare") == {"reuses_absent_letter"}   # s、p、e 都已知不存在
+    assert k.violations("spare") == {"reuses_absent_letter"}  # s、p、e 都已知不存在
     assert k.violations("dolly") == set()
 
 
@@ -55,10 +55,10 @@ def test_update_delta_first_discoveries_and_upgrade():
     k = Knowledge()
     d1 = fed(k, "arise", "crane")  # YGXXG：r、e 綠，a 黃
     assert d1.new_greens == 2
-    assert d1.new_presence == 3    # r、e、a 各 +1 存在單位
+    assert d1.new_presence == 3  # r、e、a 各 +1 存在單位
     d2 = fed(k, "crane", "crane")  # 全綠
-    assert d2.new_greens == 3      # c、a、n 三個新綠位（a 是 Y→G 升級）
-    assert d2.new_presence == 2    # c、n 是新發現；a/r/e 的存在已知
+    assert d2.new_greens == 3  # c、a、n 三個新綠位（a 是 Y→G 升級）
+    assert d2.new_presence == 2  # c、n 是新發現；a/r/e 的存在已知
     # delta 上界：綠 ≤5、存在 ≤5
     assert len(k.greens) == 5 and sum(k.min_counts.values()) == 5
 
@@ -75,7 +75,7 @@ def test_exact_count_from_partial_duplicate():
     fed(k, "speed", "abide")  # XXYXY：e 得 Y+X ⇒ exact e = 1
     assert k.exact_counts["e"] == 1
     assert k.min_counts["e"] == 1
-    assert not k.is_consistent("eerie")   # 3 個 e ≠ 1
+    assert not k.is_consistent("eerie")  # 3 個 e ≠ 1
     assert k.is_consistent("abide")
 
 
@@ -85,8 +85,8 @@ def test_is_consistent_full_semantics():
     assert k.min_counts["l"] == 2
     assert k.exact_counts["a"] == 0 and k.exact_counts["b"] == 0
     assert k.is_consistent("hello")
-    assert not k.is_consistent("llama")   # 缺 e、含 a
-    assert not k.is_consistent("lolly")   # 缺 e
+    assert not k.is_consistent("llama")  # 缺 e、含 a
+    assert not k.is_consistent("lolly")  # 缺 e
     # not_at：label 的 pos0 l 拿 Y ⇒ l 不在 0 → "l...." 開頭皆不一致
     assert not k.is_consistent("leale")
 
@@ -94,8 +94,8 @@ def test_is_consistent_full_semantics():
 def test_not_at_from_x_and_y():
     k = Knowledge()
     fed(k, "arise", "crane")  # YGXXG
-    assert "a" in k.not_at[0]   # Y 也證明不在該位
-    assert "i" in k.not_at[2]   # X 同樣證明不在該位
+    assert "a" in k.not_at[0]  # Y 也證明不在該位
+    assert "i" in k.not_at[2]  # X 同樣證明不在該位
     assert 1 not in k.not_at or "r" not in k.not_at.get(1, set())
 
 

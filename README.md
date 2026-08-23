@@ -51,7 +51,7 @@ flowchart LR
 
 | 階段 | 內容 | Gate | 狀態 |
 |---|---|---|---|
-| 0 | 環境 + 協定 + 線索追蹤（純 CPU） | pytest 全綠（重複字母 14 案預驗證表） | ✅ 123 tests |
+| 0 | 環境 + 協定 + 線索追蹤（純 CPU） | pytest 全綠（重複字母 14 案預驗證表） | ✅ 135 tests |
 | 1 | 三條 baseline（200 個 held-out 詞） | results/baselines.md 真實數字 | ✅ 全部完成 |
 | 2 | 選型 spike + 猜數字煙霧訓練 | 20–30 分鐘內學習曲線上升 | ✅ reward +49%（200 步） |
 | 3 | Wordle 正式訓練（A100 80GB，3000 步）+ 前後對照評測 | 勝率顯著超過未訓練 baseline（CI 佐證） | ✅ 完整 463 詞評測通過 |
@@ -81,6 +81,11 @@ flowchart LR
 random / heuristic 的 200 詞參照上界仍保留在 [results/baselines.md](results/baselines.md)；
 heuristic 看得到完整答案表，不是公平對手。
 
+**證據邊界**：463-word 的 committed JSON 是 GPU run 產生的 aggregate；release-time 程式會
+從中重算 Wilson CI、整數 action counts、McNemar 與 Bonferroni，但完整 463 局逐回合 raw
+records 未提交。報告中的 5 局是確定性挑選的代表 transcript，不應冒充完整 raw corpus。
+逐項追溯見 [docs/claim-matrix.md](docs/claim-matrix.md)。
+
 **紅線判讀（如實陳述）**：三項成功判準中——(1) **格式錯誤率塌陷 ✅**：未訓練 base 在此
 協定下 100% 回合非法（一手合法棋都下不出來），訓練後 0.2%，tag 遵循率 0%→99.9%，
 壓倒性顯著；(2) **訓練曲線上升 ✅**：reward/mean -9.4→-3.2（3000 步），非法回合/局
@@ -91,9 +96,15 @@ Bonferroni，仍為 `p=0.000488`。不過絕對勝率只有 2.8%，所以統計�
 ## 重現與補強評測
 
 ```bash
-# 階段 0：環境（本機，純 CPU）
-python scripts/fetch_words.py        # 抓公開單字表（來源見下）
-pip install -e . pytest && pytest    # 全綠才前進
+# 階段 0：乾淨 reviewer path（Python 3.11/3.12，本機純 CPU）
+python -m venv .venv
+.venv/Scripts/python -m pip install -c constraints/dev.txt -e ".[dev]"  # Windows
+.venv/Scripts/python scripts/fetch_words.py
+.venv/Scripts/python -m pytest       # 不設定 PYTHONPATH
+.venv/Scripts/wordle-rl --help       # installed CLI smoke
+
+# non-editable wheel/sdist 測試只需另設資料位置（仍不設 PYTHONPATH）
+# PowerShell: $env:WORDLE_RL_DATA_DIR = (Resolve-Path data).Path
 
 # 階段 1：baseline
 python baselines/run_baseline.py --agent random
@@ -108,6 +119,10 @@ python scripts/make_colab_bundle.py  # 打包原始碼 → 上傳 Drive/agentic-
 python eval/run_eval.py --adapter runs/full/final --backend vllm
 python play.py --answer crane --adapter runs/full/final
 ```
+
+因第三方單字表不隨 wheel 重發，non-editable 測試的 `WORDLE_RL_DATA_DIR` 應指向 clone
+內已通過 revision/hash 驗證的 `data/`。這是資料位置設定，不是 package import 的
+`PYTHONPATH` workaround。
 
 完整 463 個 held-out 答案的前後對照已準備成
 [wordle_full463_eval_colab.ipynb](wordle_full463_eval_colab.ipynb)。在 Colab 選 **L4 GPU**，
@@ -129,12 +144,17 @@ notebook 會先用 `snapshot_download()` 把公開 LoRA 轉成本機路徑再傳
 
 ## 單字表來源
 
-由 `scripts/fetch_words.py` 於安裝時下載（不入 git；`data/SOURCE.json` 記錄 URL 與 sha256）：
+由 `scripts/fetch_words.py` 明確執行下載（不是 package install side effect；不入 git；
+`data/SOURCE.json` 記錄 revision、URL 與 sha256）：
 
 - 答案 2,315 詞：[cfreshman/wordle-answers-alphabetical](https://gist.github.com/cfreshman/a03ef2cba789d8cf00c08f767e0fad7b)
 - 額外合法猜測 10,657 詞：[cfreshman/wordle-allowed-guesses](https://gist.github.com/cfreshman/cdcdf777450c5b5301e439061d29694c)
   （合法集 = 聯集 12,972）
 - 備援（僅合法集側）：[tabatkins/wordle-list](https://github.com/tabatkins/wordle-list)（MIT）
+
+cfreshman gists 可公開存取，但未提供明確 license；本 repo 不重發其內容，只做 revision +
+hash pinned fetch。Apache-2.0 不涵蓋第三方單字表。完整來源、切分與授權稽核見
+[docs/data-governance.md](docs/data-governance.md)。
 
 ## 專案結構 / 文件
 
@@ -142,10 +162,16 @@ notebook 會先用 `snapshot_download()` 把公開 LoRA 轉成本機路徑再傳
 - [docs/decision.md](docs/decision.md)——訓練器選型（verifiers / ART / TRL）與來源
 - [docs/rewards.md](docs/rewards.md)——獎勵量級論證與防 reward hacking 分析
 - [docs/model_card.md](docs/model_card.md)——HF model card（已回填真實評測數據）
+- [docs/claim-matrix.md](docs/claim-matrix.md)——headline → artifact → recomputation test
+- [docs/release-readiness.md](docs/release-readiness.md)——本機 RC gate 與外部發布 blockers
 - [results/full_463_analysis.md](results/full_463_analysis.md)——完整 paired test 與能力漏斗
 - [wordle_full463_eval_colab.ipynb](wordle_full463_eval_colab.ipynb)——L4 上完整 held-out 評測
 - 產出模型（已上線）：[steven0226/qwen2.5-1.5b-wordle-grpo](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo)（LoRA）
   / [steven0226/qwen2.5-1.5b-wordle-grpo-merged](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo-merged)（合併全量權重）
+
+> 發布狀態：GitHub repo 尚未建立；兩個 HF remote model card 仍是較早的 200-word 版本。
+> 本機 RC 已準備 full-463 card，但依 owner 限制未 push。revision 與 linkage 稽核見
+> [docs/huggingface-audit.md](docs/huggingface-audit.md)。
 
 <!-- GitHub 發佈（暫緩，之後一鍵補上）：
 gh repo create agentic-rl-wordle --public --source=. --push

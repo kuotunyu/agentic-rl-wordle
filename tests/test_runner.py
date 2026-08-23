@@ -25,8 +25,8 @@ def test_scripted_win_and_records():
     agent = ScriptedAgent(
         [
             "let me try <guess>slate</guess>",
-            "no tag here at all ???",         # no_parse → 浪費回合
-            "<guess>slate</guess>",           # 重複
+            "no tag here at all ???",  # no_parse → 浪費回合
+            "<guess>slate</guess>",  # 重複
             "<guess>crane</guess>",
         ]
     )

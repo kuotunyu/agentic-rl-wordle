@@ -47,7 +47,7 @@ def test_lockstep_winner_drops_out():
     generate = gen_of(
         [
             ["<guess>crane</guess>", "<guess>crane</guess>"],  # g1 勝、g2 得回饋
-            ["<guess>slate</guess>"],                          # 只剩 g2
+            ["<guess>slate</guess>"],  # 只剩 g2
         ]
     )
     rollouts = play_batch_episodes(generate, [g1, g2], per_turn_max_tokens=64)
@@ -76,9 +76,7 @@ def test_budget_truncation_marks_episode():
     g = WordleGame("crane", LEGAL)
     generate = gen_of([["<guess>slate</guess>"]])
     # 預算只夠一回合（每回合最多 30 token，總預算 40）
-    (r,) = play_batch_episodes(
-        generate, [g], per_turn_max_tokens=30, max_total_tokens=40
-    )
+    (r,) = play_batch_episodes(generate, [g], per_turn_max_tokens=30, max_total_tokens=40)
     assert r.budget_truncated and r.stats["win"] == 0.0
     assert generate.calls["n"] == 1
 
@@ -216,8 +214,7 @@ def test_rollout_func_works_with_number_game():
         def generate(chats):
             state["n"] += 1
             return [
-                TurnGen(token_ids=(1,), logprobs=(-0.2,), text="<guess>50</guess>")
-                for _ in chats
+                TurnGen(token_ids=(1,), logprobs=(-0.2,), text="<guess>50</guess>") for _ in chats
             ]
 
         return generate
@@ -268,7 +265,11 @@ def fake_trl_module():
 def test_trl_generate_fn_extracts_correct_fields(fake_trl_module):
     def fake_grc(trainer, prompts, **kwargs):
         return [
-            {"completion_ids": [1, 2, 3], "logprobs": [-0.1, -0.2, -0.3], "text": "<guess>50</guess>"}
+            {
+                "completion_ids": [1, 2, 3],
+                "logprobs": [-0.1, -0.2, -0.3],
+                "text": "<guess>50</guess>",
+            }
             for _ in prompts
         ]
 
@@ -290,6 +291,7 @@ def test_trl_generate_fn_missing_fields_fails_loud_not_silent(fake_trl_module):
     絕不能靜默塞空 list（那會讓 GRPO 拿零長度 completion 去算 loss，在 CUDA 底層炸出
     難懂的 index-out-of-bounds，而不是在這裡就講清楚——M2.1 spike 實際撞到的 bug）。
     """
+
     def fake_grc(trainer, prompts, **kwargs):
         return [{"token_ids": [1, 2, 3], "logprob": [-0.1]} for _ in prompts]  # 欄位名故意錯
 

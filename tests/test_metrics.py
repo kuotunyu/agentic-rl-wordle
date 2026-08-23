@@ -80,8 +80,8 @@ def test_illegal_rate_union_catches_tagless_format_collapse():
         ],
     )
     m = aggregate([ep])
-    assert m.illegal_rate == 1.0        # union 口徑
-    assert m.env_illegal_rate == 0.0    # 環境層面全合法
+    assert m.illegal_rate == 1.0  # union 口徑
+    assert m.env_illegal_rate == 0.0  # 環境層面全合法
     assert m.tag_ok_rate == 0.0
     assert m.as_row()["illegal_rate"] == "100.0%"
 

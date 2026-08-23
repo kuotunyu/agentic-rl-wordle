@@ -124,8 +124,11 @@ def main() -> int:
     ap.add_argument("--seed", type=int, default=42, help="切分 seed（勿改，紅線）")
     ap.add_argument("--max-new-tokens", type=int, default=160)
     ap.add_argument("--no-summary", action="store_true")
-    ap.add_argument("--skip-base", action="store_true",
-                    help="沿用 results/baselines.json 既有的 base 模型列（相同協定時省一輪推理）")
+    ap.add_argument(
+        "--skip-base",
+        action="store_true",
+        help="沿用 results/baselines.json 既有的 base 模型列（相同協定時省一輪推理）",
+    )
     ap.add_argument(
         "--label-base",
         default=None,
@@ -147,7 +150,7 @@ def main() -> int:
     if args.skip_base and not can_reuse_baselines:
         ap.error("--skip-base is only valid for the existing eval_200, n=200 baseline")
 
-    rows: list[tuple[str, dict]] = []   # (label, metrics_row) 依表序
+    rows: list[tuple[str, dict]] = []  # (label, metrics_row) 依表序
     payloads: dict[str, dict] = {}
 
     # ---- baseline 列（random / heuristic）----
@@ -177,9 +180,7 @@ def main() -> int:
             # and cuts full-463 setup time roughly in half.
             shared_vllm_backend = make_backend(args, adapter=args.adapter)
             shared_vllm_backend.adapter = None
-            base_eps = run_llm_with_backend(
-                args, shared_vllm_backend, words=words, legal=legal
-            )
+            base_eps = run_llm_with_backend(args, shared_vllm_backend, words=words, legal=legal)
         else:
             base_eps = run_llm(args, adapter=None, words=words, legal=legal)
         m = aggregate(base_eps)
@@ -193,14 +194,10 @@ def main() -> int:
         print(f"[eval] 跑訓練後模型（adapter={args.adapter}）…", flush=True)
         if shared_vllm_backend is not None:
             shared_vllm_backend.adapter = args.adapter
-            tuned_eps = run_llm_with_backend(
-                args, shared_vllm_backend, words=words, legal=legal
-            )
+            tuned_eps = run_llm_with_backend(args, shared_vllm_backend, words=words, legal=legal)
             del shared_vllm_backend
         else:
-            tuned_eps = run_llm(
-                args, adapter=args.adapter, words=words, legal=legal
-            )
+            tuned_eps = run_llm(args, adapter=args.adapter, words=words, legal=legal)
         m = aggregate(tuned_eps)
         rows.append((args.label_tuned, m.as_row()))
         payloads[args.label_tuned] = metrics_payload(m)
@@ -232,7 +229,9 @@ def main() -> int:
         "|" + "---|" * (len(METRIC_COLUMNS) + 1),
     ]
     for label, row in rows:
-        lines.append("| " + label + " | " + " | ".join(row.get(k, "—") for k, _ in METRIC_COLUMNS) + " |")
+        lines.append(
+            "| " + label + " | " + " | ".join(row.get(k, "—") for k, _ in METRIC_COLUMNS) + " |"
+        )
     lines += [
         "",
         "> 指標口徑同 baselines.md；heuristic 具答案表存取（參照上界），不可與 LLM 直接互比。",

@@ -50,9 +50,7 @@ def render_markdown(store: dict) -> str:
     ]
     for name, entry in store["agents"].items():
         row = entry["metrics_row"]
-        lines.append(
-            f"| {name} | " + " | ".join(row.get(k, "—") for k, _ in METRIC_COLUMNS) + " |"
-        )
+        lines.append(f"| {name} | " + " | ".join(row.get(k, "—") for k, _ in METRIC_COLUMNS) + " |")
     lines += [
         "",
         "> ⚠ heuristic baseline 看得到完整答案表（含 eval 詞的分布）——這是 Wordle solver 的",
@@ -154,9 +152,7 @@ def main() -> int:
         },
         "episodes": [e.to_dict() for e in episodes],
     }
-    json_path.write_text(
-        json.dumps(store, ensure_ascii=False, indent=1), encoding="utf-8"
-    )
+    json_path.write_text(json.dumps(store, ensure_ascii=False, indent=1), encoding="utf-8")
     (args.out / "baselines.md").write_text(render_markdown(store), encoding="utf-8")
     print(f"[baseline] 寫入 {json_path} 與 baselines.md")
     return 0

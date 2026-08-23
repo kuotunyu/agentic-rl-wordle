@@ -35,10 +35,14 @@ def main() -> int:
     try:
         rc = train_main(
             [
-                "--preset", "smoke",
-                "--max-steps", "2",
-                "--output-dir", "runs/spike",
-                "--resume", "none",
+                "--preset",
+                "smoke",
+                "--max-steps",
+                "2",
+                "--output-dir",
+                "runs/spike",
+                "--resume",
+                "none",
             ]
         )
     except Exception as e:  # noqa: BLE001 —— spike 就是要把失敗形態印清楚
@@ -46,7 +50,9 @@ def main() -> int:
 
         traceback.print_exc()
         print(f"\n[SPIKE FAIL] {type(e).__name__}: {e}")
-        print("→ 若是 SpikeValidationError：依訊息修 rollout.py 的 _trl_generate_fn / make_rollout_func")
+        print(
+            "→ 若是 SpikeValidationError：依訊息修 rollout.py 的 _trl_generate_fn / make_rollout_func"
+        )
         print("→ 若是 GRPOConfig/GRPOTrainer 旗標錯誤：對照 trl 1.8 docs 修 train.py 的旗標名")
         print("→ 60 分鐘內修不動：轉 ART LocalBackend 備援（docs/decision.md 有指引）")
         return 1

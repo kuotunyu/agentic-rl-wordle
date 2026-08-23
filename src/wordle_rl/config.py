@@ -16,7 +16,7 @@ from dataclasses import dataclass, replace
 @dataclass(frozen=True)
 class TrainPreset:
     name: str
-    game: str                      # "wordle" | "number"
+    game: str  # "wordle" | "number"
     model_name: str = "Qwen/Qwen2.5-1.5B-Instruct"
     # LoRA
     lora_r: int = 16
@@ -24,17 +24,17 @@ class TrainPreset:
     lora_dropout: float = 0.05
     # 最佳化
     learning_rate: float = 1e-5
-    beta: float = 0.0              # KL 係數；FULL 用 0.01（PEFT 下 ref = 關 adapter，無額外顯存）
+    beta: float = 0.0  # KL 係數；FULL 用 0.01（PEFT 下 ref = 關 adapter，無額外顯存）
     warmup_steps: int = 10
     # GRPO
-    num_generations: int = 8       # 同答案一組
-    per_device_batch: int = 8      # micro-batch 大小；與組大小「獨立」——TRL 的組 advantage 在
-                                   # 生成階段就算完才切 micro-batch，唯一約束見 __post_init__
+    num_generations: int = 8  # 同答案一組
+    per_device_batch: int = 8  # micro-batch 大小；與組大小「獨立」——TRL 的組 advantage 在
+    # 生成階段就算完才切 micro-batch，唯一約束見 __post_init__
     grad_accum: int = 1
     max_completion_length: int = 1024  # 整局 token 預算（含回合間插入的回饋文字）
     per_turn_max_tokens: int = 64
     feedback_overhead_per_turn: int = 48  # 每回合回饋文字+chat template wrapper 的估計 token 數
-    temperature: float = 1.0       # rollout 探索溫度（評測另走 greedy 路徑）
+    temperature: float = 1.0  # rollout 探索溫度（評測另走 greedy 路徑）
     top_p: float = 1.0
     game_max_turns: int = 7
     # 排程
@@ -79,7 +79,7 @@ SMOKE = TrainPreset(
     beta=0.0,
     max_completion_length=1024,  # 7×(64+48)=784 的原始+回饋預算，留餘裕到 1024
     per_turn_max_tokens=64,
-    game_max_turns=7,          # number_guess 上限 7 回合
+    game_max_turns=7,  # number_guess 上限 7 回合
     # 60 步（480 局）在 M2.3 gate 實測時雜訊蓋過訊號：win_rate 每步只從 8 條軌跡算出、
     # 粗顆粒度（0/8, 1/8, ...）震盪劇烈，60 步統計上看不出趨勢。人工核對 samples/
     # transcript 確認沒有 reward hacking、格式健康，判斷是量不夠而非機制壞掉，
@@ -104,7 +104,7 @@ FULL = TrainPreset(
     # 訓練數學完全等價，但所有 batch 比例的張量峰值砍半（峰值估 ~44GB → ~27GB）。
     # 搭配 Colab A100「大量 RAM」開 80GB 卡（該開關切的是 40/80GB 顯卡）雙保險。
     per_device_batch=4,
-    grad_accum=4,              # 4 micro-batch × 4 = 16 局/optimizer step（仍 2 組/步）
+    grad_accum=4,  # 4 micro-batch × 4 = 16 局/optimizer step（仍 2 組/步）
     max_completion_length=1536,  # 6×(160+48)=1248 的原始+回饋預算，留餘裕到 1536
     per_turn_max_tokens=160,
     game_max_turns=6,

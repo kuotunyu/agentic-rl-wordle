@@ -26,7 +26,16 @@ INCLUDE = [
     "tests",
     "docs",
 ]
-EXCLUDE_PARTS = {"__pycache__", ".pytest_cache", ".venv", ".git", "data", "runs", "results", "samples"}
+EXCLUDE_PARTS = {
+    "__pycache__",
+    ".pytest_cache",
+    ".venv",
+    ".git",
+    "data",
+    "runs",
+    "results",
+    "samples",
+}
 
 
 def main() -> int:

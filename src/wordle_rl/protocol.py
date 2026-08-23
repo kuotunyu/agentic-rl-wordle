@@ -30,7 +30,9 @@ Rules:
 - An invalid word or a badly formatted reply wastes a turn.
 - Think briefly if needed (at most two short sentences), then output exactly one guess formatted as <guess>crane</guess>. Never output more than one <guess> tag."""
 
-_TURN_INSTRUCTION = "Turn {turn} of {max_turns}. Output your guess as <guess>crane</guess> (a real 5-letter word)."
+_TURN_INSTRUCTION = (
+    "Turn {turn} of {max_turns}. Output your guess as <guess>crane</guess> (a real 5-letter word)."
+)
 
 _GUESS_TAG_RE = re.compile(r"<guess>\s*([a-zA-Z]+)\s*</guess>", re.IGNORECASE)
 _TAG_MARKUP_RE = re.compile(r"</?\s*guess\s*>", re.IGNORECASE)
@@ -64,9 +66,7 @@ def render_constraint_summary(k: "Knowledge") -> str:
     parts: list[str] = []
 
     if k.greens:
-        greens = "; ".join(
-            f"position {i + 1} = {letter}" for i, letter in sorted(k.greens.items())
-        )
+        greens = "; ".join(f"position {i + 1} = {letter}" for i, letter in sorted(k.greens.items()))
         parts.append(greens)
 
     contains: list[str] = []

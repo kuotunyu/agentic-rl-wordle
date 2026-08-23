@@ -14,8 +14,8 @@ from wordle_rl.protocol import (
     render_constraint_summary,
 )
 
-
 # ---------- parse_guess ----------
+
 
 def test_parse_tag_ok():
     r = parse_guess("I'll try a common word. <guess>crane</guess>")
@@ -67,6 +67,7 @@ def test_format_example_placeholder_is_a_real_five_letter_word():
 
 
 # ---------- 摘要與訊息渲染 ----------
+
 
 def mk_record(turn, guess, feedback, raw=None, outcome="tag_ok", **kw):
     defaults = dict(
