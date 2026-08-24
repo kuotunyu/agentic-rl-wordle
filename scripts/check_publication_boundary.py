@@ -162,21 +162,75 @@ def scan_git_history(repo: Path) -> list[Finding]:
     return list(dict.fromkeys(findings))
 
 
-def scan_git_identities(repo: Path) -> list[Finding]:
-    rows = subprocess.run(
-        ["git", "log", "--all", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce"],
-        cwd=repo,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=True,
-    ).stdout.splitlines()
+def _invalid_identity_tip() -> list[Finding]:
+    return [Finding("git:identity-tip", "invalid-git-identity-tip")]
+
+
+def scan_git_identities(repo: Path, identity_tip: str = "HEAD") -> list[Finding]:
+    tip = identity_tip.strip()
+    if not tip:
+        return _invalid_identity_tip()
+
+    try:
+        resolved = subprocess.run(
+            ["git", "rev-parse", "--verify", "--end-of-options", f"{tip}^{{object}}"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return _invalid_identity_tip()
+    object_ids = resolved.stdout.splitlines()
+    if resolved.returncode != 0 or len(object_ids) != 1:
+        return _invalid_identity_tip()
+    object_id = object_ids[0]
+    if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", object_id):
+        return _invalid_identity_tip()
+
+    try:
+        object_type = subprocess.run(
+            ["git", "cat-file", "-t", object_id],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return _invalid_identity_tip()
+    if object_type.returncode != 0 or object_type.stdout.strip() != "commit":
+        return _invalid_identity_tip()
+
+    try:
+        log = subprocess.run(
+            ["git", "log", "--format=%H%x09%an%x09%ae%x09%cn%x09%ce", object_id],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
+        )
+    except OSError:
+        return [Finding("git:identity-log", "invalid-git-identity-log")]
+    rows = log.stdout.splitlines()
+    if log.returncode != 0 or not rows:
+        return [Finding("git:identity-log", "invalid-git-identity-log")]
+
     findings: list[Finding] = []
     for row in rows:
-        commit, author_name, author_email, committer_name, committer_email = row.split("\t")
-        author = (author_name, author_email.lower())
-        committer = (committer_name, committer_email.lower())
+        fields = row.split("\t")
+        if len(fields) != 5:
+            return [Finding("git:identity-log", "invalid-git-identity-log")]
+        commit, author_name, author_email, committer_name, committer_email = fields
+        if not re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", commit):
+            return [Finding("git:identity-log", "invalid-git-identity-log")]
+        author = (author_name, author_email)
+        committer = (committer_name, committer_email)
         if author != APPROVED_GIT_IDENTITY or committer != APPROVED_GIT_IDENTITY:
             findings.append(Finding(f"git:commit:{commit[:12]}", "unapproved-git-identity"))
     return findings
@@ -189,6 +243,11 @@ def parse_args() -> argparse.Namespace:
         nargs="*",
         type=Path,
         help="files/directories/archives to scan; defaults to Git tracked files",
+    )
+    parser.add_argument(
+        "--identity-tip",
+        default="HEAD",
+        help="commit whose ancestry supplies the publication identity boundary (default: HEAD)",
     )
     return parser.parse_args()
 
@@ -205,7 +264,7 @@ def main() -> int:
             findings.extend(scan_path(path))
     if not args.paths:
         findings.extend(scan_git_history(repo))
-        findings.extend(scan_git_identities(repo))
+        findings.extend(scan_git_identities(repo, args.identity_tip))
 
     findings = list(dict.fromkeys(findings))
     if findings:

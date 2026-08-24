@@ -10,6 +10,8 @@ permissions:
 jobs:
   quality:
     runs-on: ubuntu-latest
+    env:
+      PUBLICATION_IDENTITY_TIP: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -25,7 +27,7 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: python eval/analyze_full_463.py --check
-      - run: python scripts/check_publication_boundary.py
+      - run: python scripts/check_publication_boundary.py --identity-tip "$PUBLICATION_IDENTITY_TIP"
       - run: git diff --check
 
   test-install:
