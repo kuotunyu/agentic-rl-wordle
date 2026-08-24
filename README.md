@@ -5,16 +5,16 @@
 猜中才有大獎勵。零標註、零 API 費——獎勵全部程式可驗證。
 
 這不是「1.5B 模型被訓練成高勝率 Wordle solver」的故事，而是一個更有診斷價值的結果：
-GRPO 先把完全無法互動的 base model，訓練成 **99.9% 遵循 tool-like protocol、99.8% 輸出合法**
-的 agent。完整 463 詞 held-out 評測中，勝率由 0/463 提升至 13/463（2.8%，exact paired
-McNemar `p=0.000244`）；但利用跨回合線索的策略仍只學到一部分。專案因此同時呈現
+GRPO 先把完全無法互動的 base model，訓練成 **99.85% protocol adherence、99.82% legal actions**
+的 agent。完整 463 詞 held-out 評測中，勝率由 0/463 提升至 13/463 (2.81%，exact paired
+McNemar `p=0.000244140625`)；但利用跨回合線索的策略仍只學到一部分。專案因此同時呈現
 agentic RL 的統計成功、實務效果與能力邊界，而不是只展示 reward 曲線。
 
 > **English TL;DR** — Multi-turn GRPO training turned a Qwen2.5-1.5B base model that produced
-> no legal actions into an agent with **99.9% protocol adherence** and **99.8% legal actions**.
-> On the complete fixed 463-word held-out split, wins improved from **0/463 to 13/463**
-> (2.8%, paired exact McNemar `p=0.000244`). The task-success effect is statistically real but
-> practically small: constraint tracking remains weak, which this repo documents explicitly.
+> no legal actions into an agent with **99.85% protocol adherence** and **99.82% legal actions**.
+> On the complete fixed 463-word held-out split, wins improved from **0/463 to 13/463 (2.81%)**
+> (paired exact McNemar `p=0.000244140625`; Bonferroni adjusted `p=0.00048828125`). Protocol
+> learning succeeded; strategy learning remained limited; this is not a practical Wordle solver.
 
 > **prompt agent vs 訓練 agent**：市面上大多數「agent」是 prompt 工程——把規則、
 > 範例、修正全部塞進越疊越長的 system prompt，模型本身沒有變。這個專案走另一條路：
@@ -60,11 +60,11 @@ flowchart LR
 
 | 能力層次 | 未訓練 base | GRPO LoRA | 判讀 |
 |---|---:|---:|---|
-| `<guess>…</guess>` protocol 遵循 | 0.0% | **99.9%** | 明確學會 |
-| 合法動作率 | 0.0% | **99.8%** | 明確學會 |
+| `<guess>…</guess>` protocol 遵循 | 0.0% | **99.85%** | 明確學會 |
+| 合法動作率 | 0.0% | **99.82%** | 明確學會 |
 | 不重用已排除字母 | 無合法動作，無法定義 | 41.5% | 只部分學會 |
 | 保留已知綠位 | 無合法動作，無法定義 | 51.1% | 只部分學會 |
-| 6 回合內獲勝 | 0/463 | **13/463（2.8%）** | 顯著但實務效果小 |
+| 6 回合內獲勝 | 0/463 | **13/463 (2.81%)** | 顯著但實務效果小 |
 
 這個漏斗把「格式服從、合法行動、狀態追蹤、任務成功」拆開，避免用單一 reward 或 win rate
 掩蓋模型究竟在哪一層停止學習。
@@ -73,25 +73,26 @@ flowchart LR
 
 | agent | 勝率 [95% CI] | 勝局均猜 | 非法輸出率 | tag 遵循率 | 重用 X / 破壞 G |
 |---|---|---:|---:|---:|---:|
-| qwen2.5-1.5b-instruct（未訓練） | 0.0% [0.0, 0.8] | — | 100.0% | 0.0% | — |
-| qwen2.5-1.5b **+ GRPO LoRA** | **2.8% [1.6, 4.7]** | 4.08 | **0.2%** | **99.9%** | 58.5% / 48.9% |
+| qwen2.5-1.5b-instruct（未訓練） | 0/463; 0.00% [0.00%–0.82%] | — | 100.0% | 0.0% | — |
+| qwen2.5-1.5b **+ GRPO LoRA** | **13/463 (2.81%); [1.65%–4.74%]** | 4.08 | **0.18%** | **99.85%** | 58.5% / 48.9% |
 
 完整報告與代表性對局：[results/full_463_report.md](results/full_463_report.md)；
 可重現統計：[results/full_463_analysis.md](results/full_463_analysis.md)。
 random / heuristic 的 200 詞參照上界仍保留在 [results/baselines.md](results/baselines.md)；
 heuristic 看得到完整答案表，不是公平對手。
 
-**證據邊界**：463-word 的 committed JSON 是 GPU run 產生的 aggregate；release-time 程式會
+**證據邊界**：463-word 的 committed JSON 是 GPU run 產生的 aggregate-only evidence；release-time 程式會
 從中重算 Wilson CI、整數 action counts、McNemar 與 Bonferroni，但完整 463 局逐回合 raw
 records 未提交。報告中的 5 局是確定性挑選的代表 transcript，不應冒充完整 raw corpus。
 逐項追溯見 [docs/claim-matrix.md](docs/claim-matrix.md)。
 
 **紅線判讀（如實陳述）**：三項成功判準中——(1) **格式錯誤率塌陷 ✅**：未訓練 base 在此
-協定下 100% 回合非法（一手合法棋都下不出來），訓練後 0.2%，tag 遵循率 0%→99.9%，
+協定下 100% 回合非法（一手合法棋都下不出來），訓練後 legal actions 99.82%，protocol adherence 99.85%，
 壓倒性顯著；(2) **訓練曲線上升 ✅**：reward/mean -9.4→-3.2（3000 步），非法回合/局
-4.2→~0.1；(3) **勝率顯著超過 baseline ✅**：完整配對評測 0/463→13/463，兩側 exact
-McNemar `p=0.000244`。即使保守地把先看 200、再看 463 視為兩次 nested looks 並作
-Bonferroni，仍為 `p=0.000488`。不過絕對勝率只有 2.8%，所以統計成功不等於已成為實用 solver。
+4.2→~0.1；(3) **勝率顯著超過 baseline ✅**：完整配對評測 0/463→13/463 (2.81%)，兩側 exact
+McNemar `p=0.000244140625`。即使保守地把先看 200、再看 463 視為兩次 nested looks 並作
+Bonferroni，仍為 `p=0.00048828125`。Protocol learning succeeded; strategy learning remained limited;
+the 2.81% win rate is not a practical Wordle solver.
 
 ## 重現與補強評測
 
@@ -169,15 +170,10 @@ hash pinned fetch。Apache-2.0 不涵蓋第三方單字表。完整來源、切�
 - 產出模型（已上線）：[steven0226/qwen2.5-1.5b-wordle-grpo](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo)（LoRA）
   / [steven0226/qwen2.5-1.5b-wordle-grpo-merged](https://huggingface.co/steven0226/qwen2.5-1.5b-wordle-grpo-merged)（合併全量權重）
 
-> 發布狀態：GitHub repo 尚未建立；兩個 HF remote model card 仍是較早的 200-word 版本。
-> 本機 RC 已準備 full-463 card，但依 owner 限制未 push。revision 與 linkage 稽核見
+> 發布狀態：公開 GitHub source已有immutable research/evidence source commit
+> `1a077a45e309594e5bb43743a8b84d89155595d4`；本機release branch已準備兩張full-463
+> authoritative cards，但兩個HF remote README仍待後續owner authorization。revision 與 linkage 稽核見
 > [docs/huggingface-audit.md](docs/huggingface-audit.md)。
-
-<!-- GitHub 發佈（暫緩，之後一鍵補上）：
-gh repo create agentic-rl-wordle --public --source=. --push
-gh repo edit --add-topic agentic-rl --add-topic grpo --add-topic multi-turn \
-  --add-topic reinforcement-learning --add-topic wordle --add-topic qwen
--->
 
 ## License
 

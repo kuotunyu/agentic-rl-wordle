@@ -157,3 +157,31 @@ def test_authoritative_cards_are_distinct_and_honest():
 def test_authoritative_cards_are_public_boundary_clean():
     for path in (ADAPTER_CARD, MERGED_CARD):
         assert scan_text(path.name, path.read_text(encoding="utf-8")) == []
+
+
+PUBLIC_CLAIM_LITERALS = (
+    "0/463",
+    "13/463 (2.81%)",
+    "99.85% protocol adherence",
+    "99.82% legal actions",
+    "0.000244140625",
+    "0.00048828125",
+    "not a practical Wordle solver",
+    "aggregate-only",
+)
+
+
+def test_readme_and_claim_matrix_use_exact_bounded_claims():
+    readme = read_text("README.md")
+    matrix = read_text("docs/claim-matrix.md")
+
+    for literal in PUBLIC_CLAIM_LITERALS:
+        assert literal in readme, literal
+        assert literal in matrix, literal
+
+    assert "GitHub repo 尚未建立" not in readme
+    assert "full raw-record recomputation" not in readme
+    assert "practical or strong Wordle solver" not in readme
+    assert "1a077a45e309594e5bb43743a8b84d89155595d4" in readme
+    assert "immutable research/evidence source commit" in matrix
+    assert "not the final release commit" in matrix
