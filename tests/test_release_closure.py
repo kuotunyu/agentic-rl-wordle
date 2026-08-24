@@ -28,8 +28,13 @@ def git_text(revision: str, relative: str) -> str:
     ).stdout
 
 
-def sha256_bytes(path: Path) -> str:
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+def git_blob_bytes(revision: str, relative: str) -> bytes:
+    return subprocess.run(
+        ["git", "cat-file", "blob", f"{revision}:{relative}"],
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout
 
 
 def extract_backticked_value(label: str, text: str) -> str:
@@ -256,8 +261,11 @@ def test_hf_closure_receipts_match_authoritative_cards_and_release_notes():
     assert re.fullmatch(r"[0-9a-f]{40}", merged_revision)
     assert adapter_revision != "ef1e98ce214921049b86dce7c104c88875130023"
     assert merged_revision != "a59a4fb4c26e5d0612ce3a3574193ec58d46fc64"
-    assert adapter_hash == sha256_bytes(ADAPTER_CARD)
-    assert merged_hash == sha256_bytes(MERGED_CARD)
+    assert adapter_hash == hashlib.sha256(git_blob_bytes("HEAD", "docs/model_card.md")).hexdigest()
+    assert (
+        merged_hash
+        == hashlib.sha256(git_blob_bytes("HEAD", "docs/model_card_merged.md")).hexdigest()
+    )
 
     for literal in (adapter_revision, merged_revision, adapter_hash, merged_hash):
         assert literal in readiness
@@ -265,3 +273,21 @@ def test_hf_closure_receipts_match_authoritative_cards_and_release_notes():
 
     assert "HF_README_ONLY_UPDATE_VERIFIED" in readiness
     assert "PARTIAL_HF_CARD_UPDATE" in audit
+
+
+def test_model_card_receipt_hashes_ignore_crlf_worktree_representation():
+    audit = read_text("docs/huggingface-audit.md")
+    expected = {
+        "docs/model_card.md": extract_backticked_value("Post-update adapter README SHA-256", audit),
+        "docs/model_card_merged.md": extract_backticked_value(
+            "Post-update merged README SHA-256", audit
+        ),
+    }
+
+    for relative, receipt_hash in expected.items():
+        committed = git_blob_bytes("HEAD", relative)
+        crlf_worktree_representation = committed.replace(b"\n", b"\r\n")
+
+        assert crlf_worktree_representation != committed
+        assert hashlib.sha256(committed).hexdigest() == receipt_hash
+        assert hashlib.sha256(crlf_worktree_representation).hexdigest() != receipt_hash
