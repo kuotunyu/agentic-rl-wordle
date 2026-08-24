@@ -4,4 +4,4 @@
 Windows CPU 上 pytest 秒級可跑；torch/transformers/vllm/trl 只在推理與訓練模組載入。
 """
 
-__version__ = "1.0.0rc1"
+__version__ = "1.0.0"
