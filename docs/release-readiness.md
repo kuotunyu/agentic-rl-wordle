@@ -1,6 +1,6 @@
 # Release readiness — v1.0.0
 
-Status: **`LOCAL_RELEASE_CANDIDATE_READY` after the Phase A execution receipt is complete**
+Status: **`HF_README_ONLY_UPDATE_VERIFIED`; Phase D exact-head PR CI is required before merge review**
 
 Candidate package version: `1.0.0`
 
@@ -16,12 +16,25 @@ Final tag: **not created**
 | Immutable research evidence | Evidence commit `1a077a45e309594e5bb43743a8b84d89155595d4` and release-contract test | Research/evaluation blobs remain identical |
 | Public boundary | `scripts/check_publication_boundary.py` and release-contract scans | No secret, credential, private path, notebook output, or oversized artifact finding |
 | Claim discipline | `README.md`, both authoritative cards, `docs/claim-matrix.md` | Exact metrics and bounded conclusion; no practical-solver claim |
-| HF pre-state | `docs/huggingface-audit.md` | Complete approved inventories; no invented post-update revision |
+| HF closure | `docs/huggingface-audit.md` | Exact pre/post inventories; only the two authorized README blobs changed |
 | Distribution artifacts | PyPA wheel and sdist | Exactly one of each; install and CLI smoke pass; no weights or word lists included |
 | Git scope | Exact release-path allowlist and formal commit identity | No `pyproject.toml`, training, evaluation, reward, protocol, dataset, or result change |
 
 The execution report, rather than this self-referential source file, records the exact Phase A
 candidate SHA/tree, gate outputs, distribution hashes, and clean worktree result.
+
+## Verified Hugging Face README-only transaction
+
+- Adapter post revision: `e95fc44d5914d800483a847e8768b86f33719f12`
+- Merged post revision: `94c0524cf963f7b22f1dc253eda5b4ef5a075956`
+- Adapter README SHA-256: `ab9c473a8eb9efaf2ddc32873d405bb5eb6b5e305a0dddcdf774f8b7a77a0e6b`
+- Merged README SHA-256: `b9f67c27188839000385ec85900a1d6825157aec1516af883349b7e52efb8e47`
+- Public-safe receipt SHA-256:
+  `c4e429d0c34ad32a515eaae541608107afaec1f9e4bc4afa16f24b9d9561bd2d`
+
+Both filename sets remained at eight files. Every non-README blob, ordinary size, LFS SHA-256,
+and LFS size remained unchanged. The authoritative pre/post inventory is recorded in
+`docs/huggingface-audit.md`; no weight, tokenizer, configuration, or training artifact changed.
 
 ## Claim posture
 
@@ -47,15 +60,15 @@ superiority.
 
 ## Sequential external gates
 
-1. **Phase B — authorization required:** push only the exact Phase A branch, create one PR, and
-   require all six exact PR-head CI jobs to succeed. Keep the PR open.
-2. **Phase C — separate authorization required:** revalidate account and full HF inventories, then
-   perform adapter-first, README-only optimistic commits. No weight or non-README mutation.
-3. **Phase D — same authorized PR only:** record exact HF post-update revisions and receipts in
-   Git, push the closure commit, and require all six exact PR-head jobs again. Do not merge.
+1. **Phase B — complete:** the exact Phase A branch was pushed to one open PR and its six exact-head
+   CI jobs succeeded.
+2. **Phase C — complete and verified:** adapter-first README-only commits passed full pre/post
+   inventory checks; no weight or non-README artifact changed.
+3. **Phase D — current authorized checkpoint:** record these immutable receipts in the same PR,
+   push one closure commit, and require all six exact PR-head jobs again. Do not merge.
 4. **Phase E — new authorization required:** fast-forward-only main, final main CI, annotated tag,
    tag CI, source-only GitHub Release with zero additional assets, protection verification, and
    scoped cleanup.
 
-No Phase A authority permits any external mutation. No later checkpoint inherits authority from
-an earlier checkpoint.
+Phase E remains separately authorization-gated. No completed checkpoint supplies authority for
+merge, main, tag, Release, or cleanup.

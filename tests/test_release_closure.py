@@ -219,7 +219,7 @@ PRE_HF_LITERALS = (
 )
 
 
-def test_pre_hf_release_documents_exact_baseline_without_fake_post_state():
+def test_hf_release_documents_preserve_baseline_and_record_verified_post_state():
     audit = read_text("docs/huggingface-audit.md")
     readiness = read_text("docs/release-readiness.md")
     changelog = read_text("CHANGELOG.md")
@@ -228,8 +228,9 @@ def test_pre_hf_release_documents_exact_baseline_without_fake_post_state():
     for literal in PRE_HF_LITERALS:
         assert literal in audit, literal
 
-    assert "HF README-only update pending owner authorization" in audit
-    assert "LOCAL_RELEASE_CANDIDATE_READY" in readiness
+    assert "HF README-only update pending owner authorization" not in audit
+    assert "HF_README_ONLY_UPDATE_VERIFIED" in audit
+    assert "HF_README_ONLY_UPDATE_VERIFIED" in readiness
     assert "1.0.0rc1" not in readiness
     assert "## [1.0.0] - 2026-08-24" in changelog
     assert "source-only" in notes
@@ -237,5 +238,30 @@ def test_pre_hf_release_documents_exact_baseline_without_fake_post_state():
     assert EVIDENCE_SHA in notes
     assert "exact upstream Qwen commit was not preserved" in audit
     assert "adapter-to-merged derivation is documentary lineage" in audit
-    assert "Post-update adapter revision:" not in audit
-    assert "Post-update merged revision:" not in audit
+    assert "Post-update adapter revision:" in audit
+    assert "Post-update merged revision:" in audit
+
+
+def test_hf_closure_receipts_match_authoritative_cards_and_release_notes():
+    audit = read_text("docs/huggingface-audit.md")
+    readiness = read_text("docs/release-readiness.md")
+    notes = read_text("release/v1.0.0.md")
+
+    adapter_revision = extract_backticked_value("Post-update adapter revision", audit)
+    merged_revision = extract_backticked_value("Post-update merged revision", audit)
+    adapter_hash = extract_backticked_value("Post-update adapter README SHA-256", audit)
+    merged_hash = extract_backticked_value("Post-update merged README SHA-256", audit)
+
+    assert re.fullmatch(r"[0-9a-f]{40}", adapter_revision)
+    assert re.fullmatch(r"[0-9a-f]{40}", merged_revision)
+    assert adapter_revision != "ef1e98ce214921049b86dce7c104c88875130023"
+    assert merged_revision != "a59a4fb4c26e5d0612ce3a3574193ec58d46fc64"
+    assert adapter_hash == sha256_bytes(ADAPTER_CARD)
+    assert merged_hash == sha256_bytes(MERGED_CARD)
+
+    for literal in (adapter_revision, merged_revision, adapter_hash, merged_hash):
+        assert literal in readiness
+        assert literal in notes
+
+    assert "HF_README_ONLY_UPDATE_VERIFIED" in readiness
+    assert "PARTIAL_HF_CARD_UPDATE" in audit

@@ -5,8 +5,9 @@ for portfolio source releases.
 
 ## [Unreleased]
 
-- Phase B–E publication closure remains separately authorization-gated: public PR evidence, two
-  Hugging Face README-only updates, immutable HF receipt closure, stable tag, and GitHub Release.
+- Phase D exact-head PR CI and Phase E merge/tag/Release closure remain separately gated. No
+  stable tag, GitHub Release, PyPI distribution, Docker image, or additional model artifact has
+  been published.
 
 ## [1.0.0] - 2026-08-24
 
@@ -17,6 +18,8 @@ for portfolio source releases.
   blobs, bounded claims, separate model roles, and public-boundary hygiene.
 - Complete approved pre-update Hugging Face filename/blob/LFS inventories and explicit optimistic
   README-only transaction boundaries.
+- Verified post-update Hugging Face inventories and public-safe receipt evidence for the two
+  authorized README-only commits.
 
 ### Changed
 
@@ -25,22 +28,27 @@ for portfolio source releases.
   version assertions use `1.0.0`.
 - Portfolio wording uses exact full-463 values and the constrained conclusion: protocol learning
   succeeded; strategy learning remained limited; 13/463 wins (2.81%) is not practical capability.
-- Release documentation now links the public immutable evidence commit and future stable release
-  URL without inventing a final Git SHA or Hugging Face post-update revision.
+- Release documentation records adapter revision
+  `e95fc44d5914d800483a847e8768b86f33719f12` with README SHA-256
+  `ab9c473a8eb9efaf2ddc32873d405bb5eb6b5e305a0dddcdf774f8b7a77a0e6b`, and merged revision
+  `94c0524cf963f7b22f1dc253eda5b4ef5a075956` with README SHA-256
+  `b9f67c27188839000385ec85900a1d6825157aec1516af883349b7e52efb8e47`.
 
 ### Evidence boundaries
 
 - Research results, aggregate artifacts, baselines, notebooks, datasets, word-list sources,
-  training, evaluation, reward, protocol logic, model weights, and Hugging Face state are unchanged.
+  training, evaluation, reward, protocol logic, model weights, and every Hugging Face non-README
+  artifact are unchanged. Only the two authorized model-card README blobs changed.
 - Only aggregate 463-game evidence is committed; full per-episode records are unavailable.
 - Historical GPU reconstruction, upstream base revision, adapter-to-merged cryptographic lineage,
   and cfreshman word-list licensing remain explicitly incomplete.
 
-### Not published in Phase A
+### Not published by this source candidate
 
 - No PyPI distribution, Docker image, Space, dataset, tag, GitHub Release, model binary, or model
   repository artifact is published by this source candidate.
-- Both Hugging Face README updates remain pending separate owner authorization.
+- No additional Hugging Face commit is authorized or required after the verified README-only
+  transaction.
 
 ## [1.0.0-rc.1] - 2026-08-24
 
