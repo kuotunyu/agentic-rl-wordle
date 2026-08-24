@@ -23,10 +23,43 @@ vllm 可能 fork/spawn 的子行程（全新 exec 啟動）也能讀到路徑。
 
 from __future__ import annotations
 
-import glob
 import os
+import sys
+from collections.abc import Iterable
+from pathlib import Path
+
+_CUDA13_RUNTIME_RELATIVE_PATH = Path("nvidia/cu13/lib/libcudart.so.13")
 
 _applied = False
+
+
+def _python_package_roots() -> tuple[Path, ...]:
+    """Return the finite, deterministic set of active Python import roots."""
+    roots: set[Path] = set()
+    for entry in sys.path:
+        if not entry:
+            continue
+        try:
+            roots.add(Path(entry).absolute())
+        except (OSError, TypeError):
+            continue
+    return tuple(sorted(roots, key=os.fspath))
+
+
+def _discover_cuda13_runtime_dirs(
+    package_roots: Iterable[str | os.PathLike[str]] | None = None,
+) -> tuple[Path, ...]:
+    """Check one exact CUDA runtime path below each bounded Python root."""
+    roots = _python_package_roots() if package_roots is None else package_roots
+    directories: set[Path] = set()
+    for root in roots:
+        try:
+            runtime = Path(root) / _CUDA13_RUNTIME_RELATIVE_PATH
+            if runtime.is_file():
+                directories.add(runtime.parent)
+        except (OSError, TypeError):
+            continue
+    return tuple(sorted(directories, key=os.fspath))
 
 
 def fix_missing_cuda13_runtime_ld_path() -> None:
@@ -35,19 +68,21 @@ def fix_missing_cuda13_runtime_ld_path() -> None:
         return
     _applied = True
 
-    dirs = {
-        os.path.dirname(p)
-        for p in glob.glob("/usr/**/nvidia/cu13/lib/libcudart.so.13", recursive=True)
-    }
+    if sys.platform != "linux":
+        return
+
+    dirs = _discover_cuda13_runtime_dirs()
     if not dirs:
         return
-    os.environ["LD_LIBRARY_PATH"] = ":".join(dirs) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+    library_paths = [os.fspath(directory) for directory in dirs]
+    if existing := os.environ.get("LD_LIBRARY_PATH"):
+        library_paths.append(existing)
+    os.environ["LD_LIBRARY_PATH"] = os.pathsep.join(library_paths)
     import ctypes
 
-    for d in dirs:
-        so_path = os.path.join(d, "libcudart.so.13")
-        if os.path.exists(so_path):
-            try:
-                ctypes.CDLL(so_path, mode=ctypes.RTLD_GLOBAL)
-            except OSError:
-                pass
+    for directory in dirs:
+        runtime = directory / _CUDA13_RUNTIME_RELATIVE_PATH.name
+        try:
+            ctypes.CDLL(os.fspath(runtime), mode=ctypes.RTLD_GLOBAL)
+        except OSError:
+            pass
