@@ -84,6 +84,27 @@ def test_source_and_workflow_use_stable_version_and_exact_action_pins():
     assert "name: wordle-rl-1.0.0" in workflow
 
 
+def test_ci_jobs_running_full_pytest_fetch_immutable_evidence_history():
+    workflow = read_text(".github/workflows/ci.yml")
+    job_blocks = re.findall(
+        r"^  ([a-z][a-z0-9-]*):\n(.*?)(?=^  [a-z][a-z0-9-]*:\n|\Z)",
+        workflow,
+        flags=re.MULTILINE | re.DOTALL,
+    )
+    pytest_jobs = {
+        name: body for name, body in job_blocks if "      - run: python -m pytest\n" in body
+    }
+
+    assert set(pytest_jobs) == {"test-install"}
+    for name, body in pytest_jobs.items():
+        assert body.count(f"      - uses: actions/checkout@{CHECKOUT_SHA}\n") == 1, name
+        assert (
+            f"      - uses: actions/checkout@{CHECKOUT_SHA}\n"
+            "        with:\n"
+            "          fetch-depth: 0\n"
+        ) in body, f"{name} must fetch the immutable evidence commit before pytest"
+
+
 def test_research_artifacts_match_evidence_source():
     for relative in IMMUTABLE_PATHS:
         worktree_blob = subprocess.run(
