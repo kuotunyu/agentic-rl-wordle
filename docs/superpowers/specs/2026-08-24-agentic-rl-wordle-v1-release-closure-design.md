@@ -1,6 +1,6 @@
 # Agentic RL Wordle v1.0.0 Release Closure Design
 
-Status: **owner-approved design / written spec review required**
+Status: **owner written review approved / implementation plan authorized**
 
 Decision: **Approach A — staged, identity-preserving external closure**
 
