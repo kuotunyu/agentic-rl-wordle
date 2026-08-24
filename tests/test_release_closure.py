@@ -101,3 +101,59 @@ def test_research_artifacts_match_evidence_source():
             check=True,
         ).stdout.strip()
         assert worktree_blob == evidence_blob, relative
+
+
+SHARED_CARD_LITERALS = (
+    "0/463",
+    "13/463 = 2.81%",
+    "0.00%–0.82%",
+    "1.65%–4.74%",
+    "2749/2753 = 99.85%",
+    "2748/2753 = 99.82%",
+    "0.000244140625",
+    "0.00048828125",
+    "1340/2290",
+    "1119/2290",
+    "Protocol learning succeeded; strategy learning remained limited",
+    "not a practical Wordle solver",
+    "full per-episode records are unavailable",
+    "documentary lineage, not complete cryptographic proof",
+    "cfreshman word lists are fetch-only and have no explicit license",
+    "https://github.com/kuotunyu/agentic-rl-wordle/commit/1a077a45e309594e5bb43743a8b84d89155595d4",
+    "https://github.com/kuotunyu/agentic-rl-wordle/releases/tag/v1.0.0",
+)
+
+
+def test_authoritative_cards_are_distinct_and_honest():
+    adapter = ADAPTER_CARD.read_text(encoding="utf-8")
+    merged = MERGED_CARD.read_text(encoding="utf-8")
+
+    assert adapter != merged
+    assert "LoRA adapter" in adapter
+    assert "Qwen/Qwen2.5-1.5B-Instruct" in adapter
+    assert "rank 16" in adapter
+    assert "alpha 32" in adapter
+    assert "dropout 0.05" in adapter
+    assert "must be loaded together with the compatible base model" in adapter
+    assert "reported tuned evaluation is the adapter evaluation" in adapter
+
+    assert "merged full model" in merged
+    assert "does not require a separately attached LoRA adapter" in merged
+    assert "No independent 463-word evaluation was run against these merged bytes" in merged
+    assert "not an independent replication" in merged
+
+    for literal in SHARED_CARD_LITERALS:
+        assert literal in adapter, literal
+        assert literal in merged, literal
+
+    assert adapter.startswith("---\nlicense: apache-2.0\n")
+    assert merged.startswith("---\nlicense: apache-2.0\n")
+    assert "library_name: peft" in adapter
+    assert "library_name: peft" not in merged
+    assert "Apache-2.0 does not license the cfreshman word lists" in adapter
+    assert "Apache-2.0 does not license the cfreshman word lists" in merged
+
+
+def test_authoritative_cards_are_public_boundary_clean():
+    for path in (ADAPTER_CARD, MERGED_CARD):
+        assert scan_text(path.name, path.read_text(encoding="utf-8")) == []
