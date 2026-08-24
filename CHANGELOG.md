@@ -1,34 +1,49 @@
 # Changelog
 
 All notable changes to this project are documented here. The project follows Semantic Versioning
-for portfolio releases.
+for portfolio source releases.
 
 ## [Unreleased]
 
-- External publication is pending: no GitHub remote, tag, or release has been created, and the two
-  public Hugging Face model cards still need the local full-463 update.
+- Phase B–E publication closure remains separately authorization-gated: public PR evidence, two
+  Hugging Face README-only updates, immutable HF receipt closure, stable tag, and GitHub Release.
 
-## [1.0.0-rc.1] - 2026-08-24
+## [1.0.0] - 2026-08-24
 
 ### Added
 
-- Python 3.11/3.12 package, editable, wheel, sdist, import, and installed-CLI gates.
-- Exact local/CI dependency constraints, Ruff, PyPA build, and GitHub Actions candidate checks.
-- Revision- and SHA-pinned word-list fetching with explicit license boundaries.
-- Aggregate-evidence recomputation for Wilson intervals, protocol/legal integer counts, exact
-  paired McNemar, and the conservative two-look Bonferroni statement.
-- Claim matrix, data governance audit, Hugging Face revision audit, publication-boundary scanner,
-  release-readiness checklist, and v1.0.0 candidate notes.
+- Distinct authoritative model cards for the LoRA adapter and historical merged full model.
+- Stable release-contract tests for version consistency, exact action pins, immutable research
+  blobs, bounded claims, separate model roles, and public-boundary hygiene.
+- Complete approved pre-update Hugging Face filename/blob/LFS inventories and explicit optimistic
+  README-only transaction boundaries.
 
 ### Changed
 
-- Package version advanced from 0.1.0 to 1.0.0rc1 and metadata now uses the formal `kuotunyu`
-  noreply identity plus `steven0226` model URLs.
-- The local play entry point is installable as `wordle-rl` and `python -m wordle_rl`.
-- Portfolio wording consistently states that protocol learning succeeded while Wordle strategy
-  and the absolute 2.8% task-success rate remained limited.
+- Package version advanced from `1.0.0rc1` to `1.0.0` through the existing dynamic version source.
+- GitHub Actions third-party actions are pinned to owner-verified full commit SHAs; CI artifact and
+  version assertions use `1.0.0`.
+- Portfolio wording uses exact full-463 values and the constrained conclusion: protocol learning
+  succeeded; strategy learning remained limited; 13/463 wins (2.81%) is not practical capability.
+- Release documentation now links the public immutable evidence commit and future stable release
+  URL without inventing a final Git SHA or Hugging Face post-update revision.
 
-### Not changed
+### Evidence boundaries
 
-- Training weights, raw evaluation aggregate, reported wins, rates, and statistical outcomes.
-- Any GitHub/Hugging Face external state; no tag or release was created.
+- Research results, aggregate artifacts, baselines, notebooks, datasets, word-list sources,
+  training, evaluation, reward, protocol logic, model weights, and Hugging Face state are unchanged.
+- Only aggregate 463-game evidence is committed; full per-episode records are unavailable.
+- Historical GPU reconstruction, upstream base revision, adapter-to-merged cryptographic lineage,
+  and cfreshman word-list licensing remain explicitly incomplete.
+
+### Not published in Phase A
+
+- No PyPI distribution, Docker image, Space, dataset, tag, GitHub Release, model binary, or model
+  repository artifact is published by this source candidate.
+- Both Hugging Face README updates remain pending separate owner authorization.
+
+## [1.0.0-rc.1] - 2026-08-24
+
+- Established clean editable/regular install, build, analysis, claim-matrix, governance, and
+  publication-boundary foundations for the portfolio release candidate.
+- Included the bounded Linux CUDA runtime discovery hotfix without changing research claims.

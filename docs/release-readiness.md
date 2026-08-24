@@ -1,70 +1,61 @@
-# Release readiness — v1.0.0 candidate
+# Release readiness — v1.0.0
 
-Status: **`PORTFOLIO_RELEASE_CANDIDATE / EXTERNAL_PUBLICATION_REQUIRED`**
-Candidate package version: `1.0.0rc1`
+Status: **`LOCAL_RELEASE_CANDIDATE_READY` after the Phase A execution receipt is complete**
+
+Candidate package version: `1.0.0`
+
 Final tag: **not created**
 
-## Owner-requested closure matrix
+## Phase A release contract
 
-| # | Requirement | Local candidate evidence | Status |
-|---:|---|---|---|
-| 1 | Disposable editable/non-editable installs | Fresh Python 3.12 editable, Python 3.11 regular, Python 3.12 wheel, and Python 3.12 sdist venvs passed install/import/CLI gates; editable, regular, and wheel paths each passed 135 tests without `PYTHONPATH` | Ready |
-| 2 | Unified metadata/Python/dependencies | `pyproject.toml`: Python `>=3.11,<3.13`, dynamic `1.0.0rc1`, zero-dependency core, bounded `dev`/`play`, pinned setuptools/wheel | Ready |
-| 3 | Reproducible lock/constraints | `constraints/dev.txt` exactly pins the local/CI tool graph; `requirements.txt` consumes it | Ready for local/CI; historical GPU stack is separate |
-| 4 | Clean pytest/CLI/import | 135 tests pass after editable, regular, and wheel installs with no `PYTHONPATH`; non-editable tests set only documented `WORDLE_RL_DATA_DIR` for fetch-only data; isolated installed help does not import Torch or download data/models | Ready |
-| 5 | Recompute 463 evidence | `eval/analyze_full_463.py`, schema-2 analysis, focused and committed-artifact tests | Ready at aggregate evidence level |
-| 6 | Claim matrix | `docs/claim-matrix.md` | Ready |
-| 7 | Split/seed/source/license audit | `docs/data-governance.md`; revision/hash fetch; executable split tests | Ready with explicit cfreshman license caveat |
-| 8 | HF revisions/card/linkage | `docs/huggingface-audit.md` | Audited; external fixes blocked by no-push restriction |
-| 9 | Transcripts/prompts/paths/tokens/private data | `scripts/check_publication_boundary.py`; notebooks have no outputs; `interview.md` is ignored; Drive paths are generic; only token variable names remain | Ready, with full raw-eval absence disclosed |
-| 10 | Actions/Ruff/build/clean install/security | `.github/workflows/ci.yml`, Ruff config, build/install jobs, evidence and boundary gates; final local mirror passed Ruff, build, artifact scan, metadata comparison, and disposable installs | Ready locally; public Actions run awaits GitHub publication |
-| 11 | Readiness/CHANGELOG/v1.0.0 data | This file, `CHANGELOG.md`, `release/v1.0.0.md`; no tag | Ready |
-| 12 | Formal identities/URLs | package author/maintainer and every Git commit use `kuotunyu` noreply; HF URLs use `steven0226`; intended repo is `kuotunyu/agentic-rl-wordle` | Ready locally; GitHub URL not live |
+| Requirement | Evidence | Required result |
+|---|---|---|
+| Stable package identity | `src/wordle_rl/__init__.py`, dynamic metadata, wheel and sdist metadata | Source, wheel, sdist, isolated imports, and both CLIs report `1.0.0` |
+| Python reviewer paths | Disposable Python 3.11/3.12 editable and regular installs | Full pytest, isolated import, module CLI, and console CLI pass without `PYTHONPATH` |
+| Quality and analysis | Ruff, `eval/analyze_full_463.py --check`, complete pytest | All pass; aggregate recomputation is exact |
+| Immutable research evidence | Evidence commit `1a077a45e309594e5bb43743a8b84d89155595d4` and release-contract test | Research/evaluation blobs remain identical |
+| Public boundary | `scripts/check_publication_boundary.py` and release-contract scans | No secret, credential, private path, notebook output, or oversized artifact finding |
+| Claim discipline | `README.md`, both authoritative cards, `docs/claim-matrix.md` | Exact metrics and bounded conclusion; no practical-solver claim |
+| HF pre-state | `docs/huggingface-audit.md` | Complete approved inventories; no invented post-update revision |
+| Distribution artifacts | PyPA wheel and sdist | Exactly one of each; install and CLI smoke pass; no weights or word lists included |
+| Git scope | Exact release-path allowlist and formal commit identity | No `pyproject.toml`, training, evaluation, reward, protocol, dataset, or result change |
+
+The execution report, rather than this self-referential source file, records the exact Phase A
+candidate SHA/tree, gate outputs, distribution hashes, and clean worktree result.
 
 ## Claim posture
 
-Approved wording: protocol learning succeeded; strategy learning remained limited. The tuned model
-produced 13/463 wins (2.8%) and is **not** a practical Wordle solver. Exact paired significance
-supports a nonzero task-success difference in this fixed paired evaluation; it does not turn the
-small absolute win rate into practical capability or an independent replication.
+Approved wording: **Protocol learning succeeded; strategy learning remained limited; the 2.81%
+win rate is not a practical Wordle solver.**
 
-The training-curve figures in historical docs lack committed raw `metrics.jsonl`. They are run
-records, not release-time recomputable headline evidence. The primary portfolio headline relies on
-the committed 463 aggregate and explicitly states its evidence level.
+The fixed paired aggregate contains base 0/463 and tuned 13/463 (2.81%), with tuned Wilson 95% CI
+1.65%–4.74%, exact paired McNemar `p=0.000244140625`, and Bonferroni-adjusted
+`p=0.00048828125`. Protocol adherence was 2749/2753 (99.85%) and legal actions were 2748/2753
+(99.82%). These results support protocol learning and a small task-success difference, not
+practical solving capability, complete strategy learning, production readiness, or general RL
+superiority.
 
-## External publication blockers
+## Evidence and lineage limits
 
-These cannot be closed without actions prohibited in the current task:
+- Only aggregate 463-game evidence is committed; full per-episode records are unavailable.
+- The historical GPU environment is not bit-for-bit reconstructable.
+- The exact upstream Qwen commit, adapter-to-merged command/manifest, and complete
+  run→code→prompt→bundle→model cryptographic chain were not preserved.
+- The cfreshman word lists remain fetch-only with no explicit license; Apache-2.0 does not license
+  those third-party lists.
+- Representative transcripts are illustrations, not a complete raw corpus.
 
-1. **No GitHub publication:** the repository has no remote; `kuotunyu/agentic-rl-wordle` must be
-   created and this candidate SHA pushed before package URLs/model-card links become live.
-2. **Stale Hugging Face cards:** both public cards still say 4/200 and “not significant.” Sync the
-   local full-463 card to adapter and merged repositories without changing weights.
-3. **Missing bidirectional evidence linkage:** both HF cards must link the immutable Git candidate
-   SHA; GitHub release evidence must pin the two HF revisions recorded in the HF audit.
-4. **Incomplete model lineage manifest:** adapter metadata does not pin the upstream Qwen revision,
-   and no public manifest cryptographically links base + adapter → merged output.
-5. **Evaluation provenance is not self-contained:** the committed aggregate does not embed Git SHA,
-   prompt/bundle hash, or adapter revision. Current linkage can be audited historically but not
-   proven from the result file alone.
+## Sequential external gates
 
-Evidence/license decisions required at publication time:
+1. **Phase B — authorization required:** push only the exact Phase A branch, create one PR, and
+   require all six exact PR-head CI jobs to succeed. Keep the PR open.
+2. **Phase C — separate authorization required:** revalidate account and full HF inventories, then
+   perform adapter-first, README-only optimistic commits. No weight or non-README mutation.
+3. **Phase D — same authorized PR only:** record exact HF post-update revisions and receipts in
+   Git, push the closure commit, and require all six exact PR-head jobs again. Do not merge.
+4. **Phase E — new authorization required:** fast-forward-only main, final main CI, annotated tag,
+   tag CI, source-only GitHub Release with zero additional assets, protection verification, and
+   scoped cleanup.
 
-- Either publish redacted full per-episode evaluation records and their hash, or retain the current
-  aggregate-only evidence disclosure and avoid “raw-recomputed” wording.
-- Keep cfreshman lists fetch-only and preserve the “no explicit license found” notice; Apache-2.0
-  must not be presented as licensing those third-party lists.
-- If exact historical training-environment recreation is a publication requirement, recover the
-  original complete `pip freeze`/container manifest. `requirements-colab.txt` records direct
-  constraints and observed core versions but is not a fully resolved GPU lock.
-
-## Final external sequence
-
-1. Create `kuotunyu/agentic-rl-wordle` and push the local candidate commit.
-2. Let GitHub Actions pass on the public SHA.
-3. Resolve the evidence/license decisions above and amend docs only by lowering unsupported claims.
-4. Update both HF cards and add exact Git/HF/model-lineage links.
-5. Re-run public-boundary and claim checks on the final tree.
-6. Only then create the annotated `v1.0.0` tag and GitHub Release.
-
-Recommended GitHub repository name: **`agentic-rl-wordle`**.
+No Phase A authority permits any external mutation. No later checkpoint inherits authority from
+an earlier checkpoint.

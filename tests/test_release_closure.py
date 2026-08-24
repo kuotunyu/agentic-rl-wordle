@@ -185,3 +185,36 @@ def test_readme_and_claim_matrix_use_exact_bounded_claims():
     assert "1a077a45e309594e5bb43743a8b84d89155595d4" in readme
     assert "immutable research/evidence source commit" in matrix
     assert "not the final release commit" in matrix
+
+
+PRE_HF_LITERALS = (
+    "ef1e98ce214921049b86dce7c104c88875130023",
+    "a59a4fb4c26e5d0612ce3a3574193ec58d46fc64",
+    "c3ab2ecbc0a032e77345239b02f41b967a8398017e312d7a2ea8e45a04afcf5b",
+    "d3a35ef0db5324b3f67135e0cd216dbd980cd6afc0cf03aaf6621e36b9777e00",
+    "92e6379ed7ddf363e7f500b143afa7a2dc725d3e86bd87bc9eb933831c7d68b7",
+    "9df95d5c562cd327397015f3324e3627fd280725af4f10be014233835e778ab8",
+    "b6c55086e798e1f62e6d970f07ee97ab39c1e0af3ee4b6ecdb2a349e485087af",
+)
+
+
+def test_pre_hf_release_documents_exact_baseline_without_fake_post_state():
+    audit = read_text("docs/huggingface-audit.md")
+    readiness = read_text("docs/release-readiness.md")
+    changelog = read_text("CHANGELOG.md")
+    notes = read_text("release/v1.0.0.md")
+
+    for literal in PRE_HF_LITERALS:
+        assert literal in audit, literal
+
+    assert "HF README-only update pending owner authorization" in audit
+    assert "LOCAL_RELEASE_CANDIDATE_READY" in readiness
+    assert "1.0.0rc1" not in readiness
+    assert "## [1.0.0] - 2026-08-24" in changelog
+    assert "source-only" in notes
+    assert "zero additional assets" in notes
+    assert EVIDENCE_SHA in notes
+    assert "exact upstream Qwen commit was not preserved" in audit
+    assert "adapter-to-merged derivation is documentary lineage" in audit
+    assert "Post-update adapter revision:" not in audit
+    assert "Post-update merged revision:" not in audit
