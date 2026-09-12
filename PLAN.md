@@ -1,5 +1,10 @@
 # agentic-rl-wordle — v1 實作計畫
 
+> **歷史 v1 設計記錄。** 此文件保留初始規劃與當時環境，並非目前待辦或操作入口。
+> 專案已存在於 GitHub；目前成果與使用方式以 [README.md](README.md) 為準。
+> 下文的「資料夾全空／非 git repo」、暫緩發布、重新初始化與搬移目錄指示均已過時，
+> 不應據此重建 repository、搬動 checkout 或重跑訓練。
+
 ## Context
 
 作品集 R03：用多輪 GRPO 把 `Qwen/Qwen2.5-1.5B-Instruct` 訓練成會玩 Wordle 的 agent。
