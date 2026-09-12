@@ -16,6 +16,12 @@ APPROVED_GIT_IDENTITY = (
     "kuotunyu",
     "61350295+kuotunyu@users.noreply.github.com",
 )
+# GitHub squash/merge commits retain the formal author but use this committer.
+# Keep this role-specific exception out of the file-content email allowlist.
+APPROVED_GIT_COMMITTERS = {
+    APPROVED_GIT_IDENTITY,
+    ("GitHub", "noreply" + "@github.com"),
+}
 TEXT_SUFFIXES = {
     ".cfg",
     ".ini",
@@ -231,7 +237,7 @@ def scan_git_identities(repo: Path, identity_tip: str = "HEAD") -> list[Finding]
             return [Finding("git:identity-log", "invalid-git-identity-log")]
         author = (author_name, author_email)
         committer = (committer_name, committer_email)
-        if author != APPROVED_GIT_IDENTITY or committer != APPROVED_GIT_IDENTITY:
+        if author != APPROVED_GIT_IDENTITY or committer not in APPROVED_GIT_COMMITTERS:
             findings.append(Finding(f"git:commit:{commit[:12]}", "unapproved-git-identity"))
     return findings
 
