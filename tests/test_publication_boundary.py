@@ -3,8 +3,9 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from scripts.check_publication_boundary import (
-    Finding,
     scan_git_history,
     scan_git_identities,
     scan_text,
@@ -211,17 +212,53 @@ def test_explicit_branch_tip_excludes_synthetic_merge_ref(tmp_path):
     assert findings == []
 
 
-def test_explicit_synthetic_merge_tip_still_rejects_github_committer(tmp_path):
+def test_explicit_synthetic_merge_tip_accepts_exact_github_committer(tmp_path):
     fixture = _identity_tip_fixture(tmp_path)
 
-    findings = scan_git_identities(tmp_path, fixture["synthetic"])
+    assert scan_git_identities(tmp_path, fixture["synthetic"]) == []
 
-    assert findings == [
-        Finding(
-            f"git:commit:{fixture['synthetic'][:12]}",
-            "unapproved-git-identity",
-        )
-    ]
+
+@pytest.mark.parametrize(
+    "author_name,author_email,committer_name,committer_email,accepted",
+    [
+        (APPROVED_NAME, APPROVED_EMAIL, APPROVED_NAME, APPROVED_EMAIL, True),
+        (APPROVED_NAME, APPROVED_EMAIL, "GitHub", GITHUB_EMAIL, True),
+        (APPROVED_NAME, APPROVED_EMAIL, "Other", GITHUB_EMAIL, False),
+        (APPROVED_NAME, APPROVED_EMAIL, "GitHub", OTHER_EMAIL, False),
+        (APPROVED_NAME, APPROVED_EMAIL, "github", GITHUB_EMAIL, False),
+        (APPROVED_NAME, APPROVED_EMAIL, "GitHub", GITHUB_EMAIL.upper(), False),
+        (APPROVED_NAME, APPROVED_EMAIL, "GitHub", APPROVED_EMAIL, False),
+        (APPROVED_NAME, APPROVED_EMAIL, APPROVED_NAME, GITHUB_EMAIL, False),
+        ("GitHub", GITHUB_EMAIL, "GitHub", GITHUB_EMAIL, False),
+        ("Other", APPROVED_EMAIL, "GitHub", GITHUB_EMAIL, False),
+        (APPROVED_NAME, OTHER_EMAIL, "GitHub", GITHUB_EMAIL, False),
+    ],
+)
+def test_squash_commit_requires_formal_author_and_exact_committer_pair(
+    tmp_path, author_name, author_email, committer_name, committer_email, accepted
+):
+    _git(tmp_path, "init", "-q")
+    commit_env = os.environ.copy()
+    commit_env.update(
+        {
+            "GIT_AUTHOR_NAME": author_name,
+            "GIT_AUTHOR_EMAIL": author_email,
+            "GIT_COMMITTER_NAME": committer_name,
+            "GIT_COMMITTER_EMAIL": committer_email,
+        }
+    )
+    _git(tmp_path, "commit", "--allow-empty", "-qm", "squash identity fixture", env=commit_env)
+
+    findings = scan_git_identities(tmp_path)
+
+    if accepted:
+        assert findings == []
+    else:
+        assert {finding.kind for finding in findings} == {"unapproved-git-identity"}
+
+
+def test_github_committer_email_is_not_allowed_in_file_contents():
+    assert _kinds(GITHUB_EMAIL) == {"unapproved-email"}
 
 
 def test_branch_ancestry_still_rejects_real_unapproved_commit(tmp_path):
