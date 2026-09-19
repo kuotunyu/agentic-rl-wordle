@@ -40,8 +40,8 @@ flowchart LR
     GRPO -.-> EV[eval：完整 463 held-out 詞<br/>Wilson 95% CI + paired exact test]
 ```
 
-- **assistant-only loss（結構性）**：只有模型生成的 token 進 completion_ids，
-  環境回饋只存在於重新渲染的 prompt 側——不依賴 chat template 的 mask 支援。
+- **assistant-only loss（`env_mask`）**：`completion_ids` 保留模型生成與回合間環境回饋的連續序列。
+  `env_mask` 將模型生成位置設為 1、環境插入位置設為 0，讓 TRL 只對前者計算 loss（見 [rollout 契約測試](tests/test_rollout.py)）。
 - **同組同答案**：GRPO 的 8 條軌跡共享同一個隱藏答案（rollout 內 seeded sampler），
   組內優勢比較才有意義。
 - **TRL 接觸面隔離**：實驗性 API 全部關在 `src/wordle_rl/rollout.py`——
