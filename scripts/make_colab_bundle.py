@@ -17,7 +17,6 @@ INCLUDE = [
     "pyproject.toml",
     "requirements.txt",
     "requirements-colab.txt",
-    "PLAN.md",
     "play.py",
     "src",
     "scripts",

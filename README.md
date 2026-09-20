@@ -159,7 +159,6 @@ hash pinned fetch。Apache-2.0 不涵蓋第三方單字表。完整來源、切�
 
 ## 專案結構 / 文件
 
-- [PLAN.md](PLAN.md)——完整 v1 計畫（含研究查證、設計決策表、里程碑 gate）
 - [docs/decision.md](docs/decision.md)——訓練器選型（verifiers / ART / TRL）與來源
 - [docs/rewards.md](docs/rewards.md)——獎勵量級論證與防 reward hacking 分析
 - [docs/model_card.md](docs/model_card.md)——HF model card（已回填真實評測數據）
